@@ -1,3 +1,4 @@
+// v QuestTypes.h
 #pragma once
 
 // Forward declarations and common types for Quest-related classes
@@ -10,3 +11,4 @@ enum class QuestState {
     Completed,
     Failed
 };
+// ^ QuestTypes.h

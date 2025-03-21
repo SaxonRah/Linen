@@ -1,8 +1,9 @@
 // v LinenTest.cpp
 #include "LinenTest.h"
+#include "Linen.h"
+#include "LinenSystemIncludes.h"
 #include "Engine/Core/Log.h"
 #include "Engine/Scripting/Plugins/PluginManager.h"
-#include "Linen.h"
 
 LinenTest::LinenTest(const SpawnParams& params)
     : Script(params)
@@ -11,7 +12,7 @@ LinenTest::LinenTest(const SpawnParams& params)
 }
 
 void LinenTest::OnEnable()
-{
+{   
     try {
         LOG(Info, "LinenTest::OnEnable : Starting LinenTest");
 
@@ -20,6 +21,16 @@ void LinenTest::OnEnable()
         
         if (plugin) {
             LOG(Info, "LinenTest::OnEnable : Found Linen Plugin!");
+
+            // Test some functionality
+            auto* questSystem = plugin->GetSystem<QuestSystem>();
+            if (questSystem) {
+                LOG(Info, "Quest System loaded");
+                questSystem->AddQuest("test_quest", "Test Quest", "A test quest");
+
+            } else {
+                LOG(Error, "Quest System not found!");
+            }
 
             // Test the TestSystem
             auto* testSystem = plugin->GetSystem<TestSystem>();

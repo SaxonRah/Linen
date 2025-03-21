@@ -1,6 +1,10 @@
+// v CharacterProgressionSystem.cpp
 #include "CharacterProgressionSystem.h"
+#include "QuestEvents.h"
 #include "Linen.h"
 #include "Engine/Core/Log.h"
+
+CharacterProgressionSystem* CharacterProgressionSystem::s_instance = nullptr;
 
 Skill::Skill(const std::string& id, const std::string& name, const std::string& description)
     : m_id(id)
@@ -11,10 +15,13 @@ Skill::Skill(const std::string& id, const std::string& name, const std::string& 
 }
 
 CharacterProgressionSystem::CharacterProgressionSystem() {
-    // No dependencies for this system
+    // Initialize member variables if needed
+    m_experience = 0;
+    m_level = 1;
 }
 
 CharacterProgressionSystem::~CharacterProgressionSystem() {
+    // Cleanup code if needed
     Shutdown();
 }
 
@@ -122,10 +129,11 @@ void CharacterProgressionSystem::HandleQuestCompleted(const QuestCompletedEvent&
     }
 }
 
-void CharacterProgressionSystem::Serialize(void* writer) const {
-    // Implementation for save system
+void CharacterProgressionSystem::Serialize(BinaryWriter& writer) const {
+    // Implementation
 }
 
-void CharacterProgressionSystem::Deserialize(void* reader) {
-    // Implementation for load system
+void CharacterProgressionSystem::Deserialize(BinaryReader& reader) {
+    // Implementation
 }
+// ^ CharacterProgressionSystem.cpp

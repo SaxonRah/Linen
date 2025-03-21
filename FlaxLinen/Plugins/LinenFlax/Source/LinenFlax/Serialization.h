@@ -1,6 +1,8 @@
+// v Serialization.h
+
 #pragma once
 
-#include "ISerializable.h"
+#include "LinenSystem.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -141,3 +143,4 @@ public:
 private:
     std::ifstream m_stream;
 };
+// ^ Serialization.h

@@ -1,3 +1,4 @@
+// v QuestEvents.h
 #pragma once
 
 #include "EventSystem.h"
@@ -21,3 +22,5 @@ public:
     QuestState oldState;
     QuestState newState;
 };
+
+// ^ QuestEvents.h

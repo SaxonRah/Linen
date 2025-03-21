@@ -1,3 +1,4 @@
+// v EventSystem.h
 #pragma once
 
 #include <functional>
@@ -199,3 +200,4 @@ For a low-priority notification:
     event.newLevel = 5;
     m_plugin->GetEventSystem().Publish(event, "", EventPriority::Low);
 */
+// ^ EventSystem.h

@@ -1,9 +1,10 @@
+// v QuestSystem.h
 #pragma once
 
 #include "RPGSystem.h"
-
 #include "QuestEvents.h"
 #include "QuestTypes.h"
+#include "Serialization.h"
 
 #include <vector>
 #include <string>
@@ -53,14 +54,21 @@ private:
 
 class QuestSystem : public RPGSystem {
 public:
-    QuestSystem();
-    ~QuestSystem();
-    
+    // Delete copy constructor and assignment operator
+    QuestSystem(const QuestSystem&) = delete;
+    QuestSystem& operator=(const QuestSystem&) = delete;
+
     // RPGSystem interface
     void Initialize() override;
     void Shutdown() override;
     void Update(float deltaTime) override;
-    std::string GetSystemName() const override { return "QuestSystem"; }
+    
+    // Implement GetName from LinenSystem
+    std::string GetName() const override { return "QuestSystem"; }
+    
+    // Serialization override
+    void Serialize(BinaryWriter& writer) const override;
+    void Deserialize(BinaryReader& reader) override;
     
     // Quest management
     bool AddQuest(const std::string& id, const std::string& title, const std::string& description);
@@ -73,18 +81,32 @@ public:
     std::vector<Quest*> GetAvailableQuests() const;
     std::vector<Quest*> GetActiveQuests() const;
     std::vector<Quest*> GetCompletedQuests() const;
+
+    // Static access method
+    static QuestSystem* GetInstance() {
+        if (!s_instance) s_instance = new QuestSystem();
+        return s_instance;
+    }
     
-    // Serialization (save/load)
-    void Serialize(void* writer) const;
-    void Deserialize(void* reader);
+    // Cleanup method
+    static void Destroy() {
+        delete s_instance;
+        s_instance = nullptr;
+    }
+    
+    ~QuestSystem();
     
 private:
+    // Private constructor
+    QuestSystem();
+
     // Internal helper methods
     void PublishQuestStateChanged(Quest* quest, QuestState oldState);
     
-    // Thread safety
-    // mutable std::mutex m_questsMutex;
+    // Singleton instance
+    static QuestSystem* s_instance;
     
     // Quest storage
     std::unordered_map<std::string, std::unique_ptr<Quest>> m_quests;
 };
+// ^ QuestSystem.h

@@ -1,7 +1,10 @@
+// v QuestSystem.cpp
 #include "QuestSystem.h"
-#include "Linen.h"
 #include "CharacterProgressionSystem.h"
+#include "Linen.h"
 #include "Engine/Core/Log.h"
+
+QuestSystem* QuestSystem::s_instance = nullptr;
 
 Quest::Quest(const std::string& id, const std::string& title, const std::string& description)
     : m_id(id)
@@ -11,6 +14,7 @@ Quest::Quest(const std::string& id, const std::string& title, const std::string&
     , m_experienceReward(0)
 {
 }
+
 
 void Quest::AddSkillRequirement(const std::string& skillName, int requiredLevel) {
     m_skillRequirements[skillName] = requiredLevel;
@@ -234,10 +238,11 @@ void QuestSystem::PublishQuestStateChanged(Quest* quest, QuestState oldState) {
     m_plugin->GetEventSystem().Publish(event);
 }
 
-void QuestSystem::Serialize(void* writer) const {
-    // Implementation for save system
+void QuestSystem::Serialize(BinaryWriter& writer) const {
+    // Implementation
 }
 
-void QuestSystem::Deserialize(void* reader) {
-    // Implementation for load system
+void QuestSystem::Deserialize(BinaryReader& reader) {
+    // Implementation
 }
+// ^ QuestSystem.cpp

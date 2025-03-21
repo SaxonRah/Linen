@@ -1,7 +1,10 @@
+// v CharacterProgressionSystem.h
 #pragma once
 
 #include "RPGSystem.h"
 #include "QuestEvents.h"
+#include "Serialization.h"
+
 #include <unordered_map>
 #include <string>
 #include <mutex>
@@ -29,14 +32,27 @@ private:
 
 class CharacterProgressionSystem : public RPGSystem {
 public:
-    CharacterProgressionSystem();
-    ~CharacterProgressionSystem();
-    
+    // Delete copy constructor and assignment operator
+    CharacterProgressionSystem(const CharacterProgressionSystem&) = delete;
+    CharacterProgressionSystem& operator=(const CharacterProgressionSystem&) = delete;
+
+    // Static access method
+    static CharacterProgressionSystem* GetInstance() {
+        if (!s_instance) s_instance = new CharacterProgressionSystem();
+        return s_instance;
+    }
+
     // RPGSystem interface
     void Initialize() override;
     void Shutdown() override;
     void Update(float deltaTime) override;
-    std::string GetSystemName() const override { return "CharacterProgressionSystem"; }
+    
+    // Implement GetName from LinenSystem
+    std::string GetName() const override { return "CharacterProgressionSystem"; }
+    
+    // Serialization override
+    void Serialize(BinaryWriter& writer) const override;
+    void Deserialize(BinaryReader& reader) override;
     
     // Skill management
     bool AddSkill(const std::string& id, const std::string& name, const std::string& description);
@@ -51,20 +67,28 @@ public:
     // Requirements checking
     const std::unordered_map<std::string, int>& GetSkills() const;
     
-    // For serialization
-    void Serialize(void* writer) const;
-    void Deserialize(void* reader);
+    // Cleanup method
+    static void Destroy() {
+        delete s_instance;
+        s_instance = nullptr;
+    }
     
+    ~CharacterProgressionSystem();
+
 private:
+    // Private constructor
+    CharacterProgressionSystem();
+
     // Event handlers
     void HandleQuestCompleted(const QuestCompletedEvent& event);
     
-    // Thread safety
-    // mutable std::mutex m_mutex;
-    
+    // Singleton Instance
+    static CharacterProgressionSystem* s_instance;
+
     // Character data
     int m_experience = 0;
     int m_level = 1;
     std::unordered_map<std::string, std::unique_ptr<Skill>> m_skills;
     std::unordered_map<std::string, int> m_skillLevels; // Cache for requirements checking
 };
+// ^ CharacterProgressionSystem.h
