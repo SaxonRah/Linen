@@ -1,7 +1,7 @@
 {
 	"ID": "9eba3d2a4cee4c099117f49c5dffc171",
 	"TypeName": "FlaxEditor.Content.Settings.GameSettings",
-	"EngineBuild": 6401,
+	"EngineBuild": 6605,
 	"Data": {
 	"ProductName": "My Game",
 	"CompanyName": "My Company",

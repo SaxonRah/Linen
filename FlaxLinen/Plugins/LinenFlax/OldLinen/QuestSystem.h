@@ -2,7 +2,7 @@
 
 #include "RPGSystem.h"
 
-#include "Events/QuestEvents.h"
+#include "QuestEvents.h"
 #include "QuestTypes.h"
 
 #include <vector>
@@ -83,7 +83,7 @@ private:
     void PublishQuestStateChanged(Quest* quest, QuestState oldState);
     
     // Thread safety
-    mutable std::mutex m_questsMutex;
+    // mutable std::mutex m_questsMutex;
     
     // Quest storage
     std::unordered_map<std::string, std::unique_ptr<Quest>> m_quests;

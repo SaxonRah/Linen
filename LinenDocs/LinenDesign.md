@@ -100,7 +100,7 @@ The event-driven architecture in particular is central to the system's design, e
 ## Creational Patterns
 
 1. **Factory Method**
-   - Used in the system creation and registration process within `LinenPlugin`
+   - Used in the system creation and registration process within `Linen`
    - `RegisterSystem<T>()` creates concrete system instances
 
 2. **Singleton** (Limited Usage)
@@ -114,7 +114,7 @@ The event-driven architecture in particular is central to the system's design, e
 ## Structural Patterns
 
 4. **Facade**
-   - `LinenPlugin` acts as a facade to the complex underlying systems
+   - `Linen` acts as a facade to the complex underlying systems
    - Provides simplified access to the RPG subsystems
 
 5. **Proxy**
@@ -165,7 +165,7 @@ The event-driven architecture in particular is central to the system's design, e
     - Each system implements its own serialization logic
 
 16. **Mediator**
-    - `LinenPlugin` acts as a mediator between different systems
+    - `Linen` acts as a mediator between different systems
     - Manages how systems discover and interact with each other
 
 ## Concurrency Patterns
@@ -190,7 +190,7 @@ The event-driven architecture in particular is central to the system's design, e
 
 21. **Dependency Injection**
     - Systems receive references to the plugin and other systems
-    - `SetPlugin(LinenPlugin* plugin)` to inject dependencies
+    - `SetPlugin(Linen* plugin)` to inject dependencies
 
 22. **Service Locator**
     - Systems locate other systems through the plugin

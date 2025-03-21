@@ -1,7 +1,7 @@
 #pragma once
 
 #include "RPGSystem.h"
-#include "Events/QuestEvents.h"
+#include "QuestEvents.h"
 #include <unordered_map>
 #include <string>
 #include <mutex>
@@ -60,7 +60,7 @@ private:
     void HandleQuestCompleted(const QuestCompletedEvent& event);
     
     // Thread safety
-    mutable std::mutex m_mutex;
+    // mutable std::mutex m_mutex;
     
     // Character data
     int m_experience = 0;

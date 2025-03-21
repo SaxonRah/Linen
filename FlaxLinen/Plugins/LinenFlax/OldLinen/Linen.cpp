@@ -1,8 +1,8 @@
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "Engine/Core/Log.h"
 #include <queue>
 
-LinenPlugin::LinenPlugin(const SpawnParams& params)
+Linen::Linen(const SpawnParams& params)
     : GamePlugin(params)
 {
     _description.Name = TEXT("Linen");
@@ -15,17 +15,17 @@ LinenPlugin::LinenPlugin(const SpawnParams& params)
     _description.Version = Version(3, 1, 0);
 }
 
-LinenPlugin::~LinenPlugin() {
+Linen::~Linen() {
     Deinitialize();
 }
 
-void LinenPlugin::Initialize() {
-    Plugin::Initialize();
+void Linen::Initialize() {
+    GamePlugin::Initialize();
     LOG(Info, "Linen Plugin Initialized.");
 }
 
-void LinenPlugin::Deinitialize() {
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
+void Linen::Deinitialize() {
+    // std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     // Unload systems in reverse dependency order
     for (auto it = m_initializationOrder.rbegin(); it != m_initializationOrder.rend(); ++it) {
@@ -44,7 +44,7 @@ void LinenPlugin::Deinitialize() {
     LOG(Info, "Linen Plugin Deinitialized.");
 }
 
-void LinenPlugin::Update(float deltaTime) {
+void Linen::Update(float deltaTime) {
     // Update all active systems in initialization order
     for (const auto& systemName : m_initializationOrder) {
         auto it = m_activeSystems.find(systemName);
@@ -57,7 +57,7 @@ void LinenPlugin::Update(float deltaTime) {
     m_eventSystem.ProcessEvents();
 }
 
-bool LinenPlugin::DetectCycle(const std::string& systemName, 
+bool Linen::DetectCycle(const std::string& systemName, 
         std::unordered_set<std::string>& visited, 
         std::unordered_set<std::string>& recursionStack) {
     if (recursionStack.count(systemName)) return true;  // Cycle detected
@@ -74,7 +74,7 @@ bool LinenPlugin::DetectCycle(const std::string& systemName,
     return false;
 }
 
-void LinenPlugin::CalculateInitializationOrder() {
+void Linen::CalculateInitializationOrder() {
     m_initializationOrder.clear();
     
     // Topological sort of systems based on dependencies
@@ -119,4 +119,4 @@ void LinenPlugin::CalculateInitializationOrder() {
     }
 }
 
-template RPGSystem* LinenPlugin::GetSystem<RPGSystem>(const std::string&);
+template RPGSystem* Linen::GetSystem<RPGSystem>(const std::string&);

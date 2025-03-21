@@ -1,5 +1,5 @@
 #include "QuestSystem.h"
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "CharacterProgressionSystem.h"
 #include "Engine/Core/Log.h"
 
@@ -48,7 +48,7 @@ void QuestSystem::Initialize() {
 }
 
 void QuestSystem::Shutdown() {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     m_quests.clear();
     LOG(Info, "Quest System Shutdown.");
 }
@@ -58,7 +58,7 @@ void QuestSystem::Update(float deltaTime) {
 }
 
 bool QuestSystem::AddQuest(const std::string& id, const std::string& title, const std::string& description) {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     if (m_quests.find(id) != m_quests.end()) {
         LOG(Warning, "Quest already exists: {0}", String(id.c_str()));
@@ -73,7 +73,7 @@ bool QuestSystem::AddQuest(const std::string& id, const std::string& title, cons
 }
 
 bool QuestSystem::ActivateQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     auto it = m_quests.find(id);
     if (it == m_quests.end()) {
@@ -100,16 +100,16 @@ bool QuestSystem::ActivateQuest(const std::string& id) {
     quest->SetState(QuestState::Active);
     
     // Publish event without lock held
-    m_questsMutex.unlock();
+    // m_questsMutex.unlock();
     PublishQuestStateChanged(quest, oldState);
-    m_questsMutex.lock();
+    // m_questsMutex.lock();
     
     LOG(Info, "Activated quest: {0}", String(id.c_str()));
     return true;
 }
 
 bool QuestSystem::CompleteQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     auto it = m_quests.find(id);
     if (it == m_quests.end()) {
@@ -127,7 +127,7 @@ bool QuestSystem::CompleteQuest(const std::string& id) {
     quest->SetState(QuestState::Completed);
     
     // Release lock before event publishing to prevent deadlocks
-    m_questsMutex.unlock();
+    // m_questsMutex.unlock();
     
     // Publish completion event
     QuestCompletedEvent event;
@@ -141,14 +141,14 @@ bool QuestSystem::CompleteQuest(const std::string& id) {
     PublishQuestStateChanged(quest, oldState);
     
     // Reacquire lock
-    m_questsMutex.lock();
+    // m_questsMutex.lock();
     
     LOG(Info, "Completed quest: {0}", String(id.c_str()));
     return true;
 }
 
 bool QuestSystem::FailQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     auto it = m_quests.find(id);
     if (it == m_quests.end()) {
@@ -166,16 +166,16 @@ bool QuestSystem::FailQuest(const std::string& id) {
     quest->SetState(QuestState::Failed);
     
     // Publish event without lock held
-    m_questsMutex.unlock();
+    // m_questsMutex.unlock();
     PublishQuestStateChanged(quest, oldState);
-    m_questsMutex.lock();
+    // m_questsMutex.lock();
     
     LOG(Info, "Failed quest: {0}", String(id.c_str()));
     return true;
 }
 
 Quest* QuestSystem::GetQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     auto it = m_quests.find(id);
     if (it == m_quests.end()) {
@@ -186,7 +186,7 @@ Quest* QuestSystem::GetQuest(const std::string& id) {
 }
 
 std::vector<Quest*> QuestSystem::GetAvailableQuests() const {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     std::vector<Quest*> result;
     for (const auto& pair : m_quests) {
@@ -199,7 +199,7 @@ std::vector<Quest*> QuestSystem::GetAvailableQuests() const {
 }
 
 std::vector<Quest*> QuestSystem::GetActiveQuests() const {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     std::vector<Quest*> result;
     for (const auto& pair : m_quests) {
@@ -212,7 +212,7 @@ std::vector<Quest*> QuestSystem::GetActiveQuests() const {
 }
 
 std::vector<Quest*> QuestSystem::GetCompletedQuests() const {
-    std::lock_guard<std::mutex> lock(m_questsMutex);
+    // std::lock_guard<std::mutex> lock(m_questsMutex);
     
     std::vector<Quest*> result;
     for (const auto& pair : m_quests) {

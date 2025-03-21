@@ -1,6 +1,6 @@
 ﻿using Flax.Build;
 
-public class LinenEditorTarget : GameProjectEditorTarget
+public class LinenFlaxEditorTarget : GameProjectEditorTarget
 {
     /// <inheritdoc />
     public override void Init()
@@ -8,7 +8,7 @@ public class LinenEditorTarget : GameProjectEditorTarget
         base.Init();
 
         // Reference the modules for editor
-        Modules.Add("Linen");
-        Modules.Add("LinenEditor");
+        Modules.Add("LinenFlax");
+        Modules.Add("LinenFlaxEditor");
     }
 }

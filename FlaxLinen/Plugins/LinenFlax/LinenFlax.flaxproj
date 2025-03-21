@@ -1,10 +1,10 @@
 ﻿{
-	"Name": "Linen",
+	"Name": "LinenFlax",
 	"Version": "0.0.1",
 	"Company": "ParabolicLabs",
 	"Copyright": "",
-	"GameTarget": "LinenTarget",
-	"EditorTarget": "LinenEditorTarget",
+	"GameTarget": "LinenFlaxTarget",
+	"EditorTarget": "LinenFlaxEditorTarget",
 	"References": [
 		{
 			"Name": "$(EnginePath)/Flax.flaxproj"

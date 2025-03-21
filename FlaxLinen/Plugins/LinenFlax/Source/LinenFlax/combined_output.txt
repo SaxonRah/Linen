@@ -1,0 +1,326 @@
+/// v ExamplePlugin.cs
+using System;
+using FlaxEngine;
+
+namespace LinenFlax
+{
+    /// <summary>
+    /// The sample game plugin.
+    /// </summary>
+    /// <seealso cref="FlaxEngine.GamePlugin" />
+    public class LinenFlax : GamePlugin
+    {
+        /// <inheritdoc />
+        public LinenFlax()
+        {
+            _description = new PluginDescription
+            {
+                Name = "LinenFlax",
+                Category = "Other",
+                Author = "",
+                AuthorUrl = null,
+                HomepageUrl = null,
+                RepositoryUrl = "https://github.com/FlaxEngine/LinenFlax",
+                Description = "This is an example plugin project.",
+                Version = new Version(0, 0, 1),
+                IsAlpha = false,
+                IsBeta = false,
+            };
+        }
+
+        /// <inheritdoc />
+        public override void Initialize()
+        {
+            base.Initialize();
+            Debug.Log("Hello from LinenFlax plugin C# code!");
+        }
+
+        /// <inheritdoc />
+        public override void Deinitialize()
+        {
+            Debug.Log("Goodbye from LinenFlax plugin C# code!");
+            base.Deinitialize();
+        }
+    }
+}
+/// ^ ExamplePlugin.cs
+// v Linen.cpp
+#include "Linen.h"
+#include "Engine/Core/Log.h"
+
+// int TestSystem::s_testValue = 0;
+
+Linen::Linen(const SpawnParams& params)
+    : GamePlugin(params)
+{
+    _description.Name = TEXT("Linen");
+#if USE_EDITOR
+    _description.Category = TEXT("Gameplay");
+    _description.Description = TEXT("Linen plugin");
+    _description.Author = TEXT("ParabolicLabs");
+    _description.RepositoryUrl = TEXT("");
+#endif
+    _description.Version = Version(1, 0, 0);
+}
+
+Linen::~Linen() {
+    Deinitialize();
+}
+
+void Linen::Initialize() {
+    GamePlugin::Initialize();
+    
+    LOG(Info, "Linen::Initialize : Starting");
+    
+    try {
+        // Create and initialize test system
+        _testSystem = std::make_unique<TestSystem>();
+        if (_testSystem) {
+            LOG(Info, "Linen::Initialize : TestSystem instance created successfully");
+            _testSystem->Initialize();
+            LOG(Info, "Linen::Initialize : TestSystem initialized successfully");
+        } else {
+            LOG(Error, "Linen::Initialize : Failed to create TestSystem instance");
+        }
+    }
+    catch (const std::exception& e) {
+        LOG(Error, "Linen::Initialize : Exception during initialization");
+    }
+    catch (...) {
+        LOG(Error, "Linen::Initialize : Unknown exception during initialization");
+    }
+    
+    LOG(Info, "Linen::Initialize : Completed");
+}
+
+void Linen::Deinitialize() {
+    // Shutdown test system
+    if (_testSystem) {
+        try {
+            _testSystem->Shutdown();
+        }
+        catch (...) {
+            LOG(Error, "Linen::Deinitialize : Error shutting down TestSystem");
+        }
+    }
+    
+    LOG(Info, "Linen::Deinitialize : ran");
+}
+
+void Linen::Update(float deltaTime) {
+    // Update test system
+    if (_testSystem) {
+        try {
+            _testSystem->Update(deltaTime);
+        }
+        catch (...) {
+            LOG(Error, "Linen::Update : Error updating TestSystem");
+        }
+    }
+}
+// ^ Linen.cpp
+// v Linen.h
+#pragma once
+
+#include "Engine/Scripting/Plugins/GamePlugin.h"
+#include "Engine/Core/Log.h"
+#include <string>
+#include <unordered_map>
+#include <memory>
+
+// Simple base system class
+class LinenSystem {
+public:
+    virtual ~LinenSystem() = default;
+    virtual void Initialize() = 0;
+    virtual void Shutdown() = 0;
+    virtual void Update(float deltaTime) {}
+    virtual std::string GetName() const = 0;
+};
+
+// Forward declaration
+class Linen;
+
+// Example test system
+class TestSystem : public LinenSystem {
+public:
+    void Initialize() override {
+        LOG(Info, "TestSystem Initialized");
+        // Static initialization instead of member variable
+        // s_testValue = 0;
+        // member var
+        _testValue = 0;
+    }
+    
+    void Shutdown() override {
+        LOG(Info, "TestSystem Shutdown");
+        // Reset the static value on shutdown
+        // s_testValue = 0;
+    }
+    
+    void Update(float deltaTime) override {}
+    
+    std::string GetName() const override { return "TestSystem"; }
+
+    // Static methods that don't rely on instance variables
+    bool AddValue(int value) {
+        LOG(Info, "TestSystem::AddValue : starting with value: {0}", value);
+        
+        // Use static variable instead of member variable
+        // s_testValue = value;
+        // member var 
+        _testValue = value;
+
+        // LOG(Info, "TestSystem::AddValue : set value to: {0}", s_testValue);
+        LOG(Info, "TestSystem::AddValue : set value to: {0}", _testValue);
+        return true;
+    }
+    
+    int GetValue() const {
+        // LOG(Info, "TestSystem::GetValue : returning: {0}", s_testValue);
+        // return s_testValue;
+        LOG(Info, "TestSystem::GetValue : returning: {0}", _testValue);
+        return _testValue;
+    }
+
+private:
+    // Use a static variable instead of instance variable
+    // static int s_testValue;
+    int _testValue;
+};
+
+
+class Linen : public GamePlugin {
+public:
+    Linen(const SpawnParams& params);
+    ~Linen();
+    
+    // Core plugin lifecycle
+    void Initialize() override;
+    void Deinitialize() override;
+    void Update(float deltaTime);
+    
+    // Get system (simplified)
+    template <typename T>
+    T* GetSystem() {
+        LOG(Info, "Linen::GetSystem : Called for type: {0}", String(typeid(T).name()));
+        
+        // Check for TestSystem with more verbose logging
+        if (_testSystem) {
+            LOG(Info, "Linen::GetSystem : TestSystem exists");
+            
+            // Check if we're asking for TestSystem
+            if (std::is_same<T, TestSystem>::value) {
+                LOG(Info, "Linen::GetSystem : Type match for TestSystem confirmed");
+                return static_cast<T*>(_testSystem.get());
+            } else {
+                LOG(Warning, "Linen::GetSystem : Type mismatch - requested {0} but have TestSystem", 
+                    String(typeid(T).name()));
+            }
+        } else {
+            LOG(Warning, "Linen::GetSystem : TestSystem instance is null");
+        }
+        
+        LOG(Warning, "Linen::GetSystem : No matching system found");
+        return nullptr;
+    }
+    
+private:
+    std::unique_ptr<TestSystem> _testSystem;
+};
+// ^ Linen.h
+// v LinenFlax.Build.cs
+using Flax.Build;
+using Flax.Build.NativeCpp;
+
+public class LinenFlax : GameModule
+{
+    /// <inheritdoc />
+    public override void Setup(BuildOptions options)
+    {
+        base.Setup(options);
+        BuildNativeCode = true;
+        options.PublicDefinitions.Add("COMPILE_WITH_FLAX");
+    }
+}
+// ^ LinenFlax.Build.cs
+// v LinenTest.cpp
+#include "LinenTest.h"
+#include "Engine/Core/Log.h"
+#include "Engine/Scripting/Plugins/PluginManager.h"
+#include "Linen.h"
+
+LinenTest::LinenTest(const SpawnParams& params)
+    : Script(params)
+{
+    _tickUpdate = true;
+}
+
+void LinenTest::OnEnable()
+{
+    try {
+        LOG(Info, "LinenTest::OnEnable : Starting LinenTest");
+
+        // Try to get the plugin from the PluginManager
+        auto* plugin = PluginManager::GetPlugin<Linen>();
+        
+        if (plugin) {
+            LOG(Info, "LinenTest::OnEnable : Found Linen Plugin!");
+
+            // Test the TestSystem
+            auto* testSystem = plugin->GetSystem<TestSystem>();
+            if (testSystem) {
+                LOG(Info, "LinenTest::OnEnable : Test System loaded");
+                LOG(Info, "LinenTest::OnEnable : About to add value");
+                testSystem->AddValue(42);
+                
+                LOG(Info, "LinenTest::OnEnable : About to get value");
+                int value = testSystem->GetValue();
+                
+                LOG(Info, "LinenTest::OnEnable : Retrieved value: {0}", value);
+            }
+            else {
+                LOG(Warning, "LinenTest::OnEnable : Test System not found");
+            }
+        }
+        else {
+            LOG(Error, "LinenTest::OnEnable : Linen Plugin not found!");
+            
+            // Instead of creating a local instance, we should find out why the plugin isn't registered
+            LOG(Info, "LinenTest::OnEnable : TODO Checking for all available plugins");
+            // This would require additional code to list all plugins
+        }
+    }
+    catch (...) {
+        LOG(Error, "LinenTest::OnEnable : Exception during Linen testing");
+    }
+
+    LOG(Info, "LinenTest::OnEnable completed");
+}
+
+void LinenTest::OnDisable()
+{
+    // Minimal implementation
+    LOG(Info, "LinenTest::OnDisable : ran.");
+}
+
+void LinenTest::OnUpdate()
+{
+    // Minimal implementation
+    LOG(Info, "LinenTest::OnUpdate : ran.");
+}
+// ^ LinenTest.cpp
+// v LinenTest.h
+#pragma once
+#include "Engine/Scripting/Script.h"
+
+API_CLASS() class LINENFLAX_API LinenTest : public Script
+{
+API_AUTO_SERIALIZATION();
+DECLARE_SCRIPTING_TYPE(LinenTest);
+
+    void OnEnable() override;
+    void OnDisable() override;
+    void OnUpdate() override;
+};
+// ^ LinenTest.h

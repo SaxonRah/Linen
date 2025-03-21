@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Engine/Scripting/Plugins/GamePlugin.h"
+
+#include "Engine/Scripting/Script.h"
+
 #include "RPGSystem.h"
 #include "EventSystem.h"
 
@@ -11,14 +14,16 @@
 #include <mutex>
 #include <typeindex>
 
-// API_CLASS(Namespace = "LINEN") class LinenPlugin : public GamePlugin {
-class LinenPlugin : public GamePlugin {
+//API_CLASS(Namespace = "LINEN") class Linen : public GamePlugin {
+class Linen : public GamePlugin {
 
-    // DECLARE_SCRIPTING_TYPE(LINEN);
+// DECLARE_SCRIPTING_TYPE(LINEN);
+// API_AUTO_SERIALIZATION();
+// DECLARE_SCRIPTING_TYPE(Linen);
 
 public:
-    LinenPlugin(const SpawnParams& params);
-    ~LinenPlugin();
+    Linen(const SpawnParams& params);
+    ~Linen();
     
     // Core plugin lifecycle
     virtual void Initialize() override;
@@ -61,7 +66,7 @@ private:
     std::unordered_map<std::type_index, std::string> m_typeToName;
     
     // Thread safety
-    std::mutex m_systemsMutex;
+    // std::mutex m_systemsMutex;
     
     // Centralized event system
     EventSystem m_eventSystem;
@@ -69,10 +74,10 @@ private:
 
 // Template implementations
 template <typename T>
-bool LinenPlugin::RegisterSystem() {
+bool Linen::RegisterSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
+    // std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto system = std::make_unique<T>();
     std::string systemName = system->GetSystemName();
@@ -97,10 +102,10 @@ bool LinenPlugin::RegisterSystem() {
 }
 
 template <typename T>
-bool LinenPlugin::LoadSystem() {
+bool Linen::LoadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
+    // std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto typeIndex = std::type_index(typeid(T));
     
@@ -151,10 +156,10 @@ bool LinenPlugin::LoadSystem() {
 }
 
 template <typename T>
-bool LinenPlugin::UnloadSystem() {
+bool Linen::UnloadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
+    // std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto typeIndex = std::type_index(typeid(T));
     if (m_typeToName.find(typeIndex) == m_typeToName.end()) {
@@ -190,10 +195,10 @@ bool LinenPlugin::UnloadSystem() {
 }
 
 template <typename T>
-T* LinenPlugin::GetSystem() {
+T* Linen::GetSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
+    // std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto typeIndex = std::type_index(typeid(T));
     if (m_typeToName.find(typeIndex) == m_typeToName.end()) {
@@ -210,10 +215,10 @@ T* LinenPlugin::GetSystem() {
 }
 
 template <typename T>
-T* LinenPlugin::GetSystem(const std::string& systemName) {
+T* Linen::GetSystem(const std::string& systemName) {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
 
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
+    // std::lock_guard<std::mutex> lock(m_systemsMutex);
 
     auto it = m_activeSystems.find(systemName);
     if (it == m_activeSystems.end()) {

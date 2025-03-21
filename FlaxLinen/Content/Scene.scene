@@ -200,7 +200,7 @@
 			"Transform": {
 				"Translation": {
 					"X": 27.05849838256836,
-					"Y": 0.09932243824005127,
+					"Y": 0.0,
 					"Z": 0.7354736328125
 				}
 			},
@@ -224,7 +224,7 @@
 			"Transform": {
 				"Translation": {
 					"X": 16.372512817382814,
-					"Y": 0.09932148456573487,
+					"Y": 0.0,
 					"Z": 5.469385147094727
 				},
 				"Orientation": {
@@ -277,6 +277,11 @@
 			}
 		},
 		{
+			"ID": "4cf4e625450fd9c33545a98c0529a2d2",
+			"TypeName": "LinenFlax.LinenTest",
+			"ParentID": "fea6bdc34d8a807a6e33ed85e72b3f94"
+		},
+		{
 			"ID": "3fbaddab4fd26af366e026a750e29e3e",
 			"TypeName": "FlaxEngine.PostFxVolume",
 			"ParentID": "74a68a984824b4510d12589f199ad68f",
@@ -291,14 +296,20 @@
 			"IsBounded": false,
 			"Settings": {
 				"AO": {
-					"OverrideFlags": 63
+					"OverrideFlags": 63,
+					"Intensity": 2.0,
+					"Power": 1.0,
+					"Radius": 5.0
 				},
 				"GI": {
 					"OverrideFlags": 63,
-					"Mode": 1
+					"Mode": 1,
+					"Intensity": 0.5,
+					"BounceIntensity": 0.5,
+					"TemporalResponse": 0.25
 				},
 				"Bloom": {
-					"OverrideFlags": 31
+					"Enabled": false
 				},
 				"ToneMapping": {},
 				"ColorGrading": {},
@@ -306,12 +317,29 @@
 					"OverrideFlags": 1,
 					"Mode": 0
 				},
-				"CameraArtifacts": {},
-				"LensFlares": {},
-				"DepthOfField": {},
-				"MotionBlur": {},
-				"SSR": {},
-				"AA": {},
+				"CameraArtifacts": {
+					"OverrideFlags": 1,
+					"VignetteIntensity": 0.0
+				},
+				"LensFlares": {
+					"OverrideFlags": 1,
+					"Intensity": 0.0
+				},
+				"DepthOfField": {
+					"BlurStrength": 0.0,
+					"FocalDistance": 0.0
+				},
+				"MotionBlur": {
+					"Enabled": false
+				},
+				"SSR": {
+					"OverrideFlags": 1,
+					"Intensity": 5.0
+				},
+				"AA": {
+					"OverrideFlags": 1,
+					"Mode": 3
+				},
 				"PostFxMaterials": {}
 			}
 		},

@@ -20,7 +20,7 @@
 #include <unordered_set>
 
 // Forward declarations
-class LinenPlugin;
+class Linen;
 
 // Base class for all RPG systems
 class RPGSystem {
@@ -39,15 +39,15 @@ public:
     virtual std::string GetSystemName() const = 0;
     
     // Plugin reference for accessing other systems
-    void SetPlugin(LinenPlugin* plugin) { m_plugin = plugin; }
+    void SetPlugin(Linen* plugin) { m_plugin = plugin; }
     
 protected:
-    LinenPlugin* m_plugin = nullptr;
+    Linen* m_plugin = nullptr;
     std::unordered_set<std::string> m_dependencies;
 };
 ```
 
-### `LinenPlugin.h`
+### `Linen.h`
 ```cpp
 #pragma once
 
@@ -62,10 +62,10 @@ protected:
 #include <mutex>
 #include <typeindex>
 
-class LinenPlugin : public Plugin {
+class Linen : public Plugin {
 public:
-    LinenPlugin();
-    ~LinenPlugin();
+    Linen();
+    ~Linen();
     
     // Core plugin lifecycle
     virtual void Initialize() override;
@@ -110,7 +110,7 @@ private:
 
 // Template implementations
 template <typename T>
-bool LinenPlugin::RegisterSystem() {
+bool Linen::RegisterSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
     std::lock_guard<std::mutex> lock(m_systemsMutex);
@@ -138,7 +138,7 @@ bool LinenPlugin::RegisterSystem() {
 }
 
 template <typename T>
-bool LinenPlugin::LoadSystem() {
+bool Linen::LoadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
     std::lock_guard<std::mutex> lock(m_systemsMutex);
@@ -192,7 +192,7 @@ bool LinenPlugin::LoadSystem() {
 }
 
 template <typename T>
-bool LinenPlugin::UnloadSystem() {
+bool Linen::UnloadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
     std::lock_guard<std::mutex> lock(m_systemsMutex);
@@ -231,7 +231,7 @@ bool LinenPlugin::UnloadSystem() {
 }
 
 template <typename T>
-T* LinenPlugin::GetSystem() {
+T* Linen::GetSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
     std::lock_guard<std::mutex> lock(m_systemsMutex);
@@ -251,27 +251,27 @@ T* LinenPlugin::GetSystem() {
 }
 ```
 
-### `LinenPlugin.cpp`
+### `Linen.cpp`
 ```cpp
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "Engine/Core/Log.h"
 #include <queue>
 
-LinenPlugin::LinenPlugin()
+Linen::Linen()
     : Plugin(TEXT("Linen RPG Plugin"), TEXT("1.0"))
 {
 }
 
-LinenPlugin::~LinenPlugin() {
+Linen::~Linen() {
     Deinitialize();
 }
 
-void LinenPlugin::Initialize() {
+void Linen::Initialize() {
     Plugin::Initialize();
     LOG(Info, "Linen Plugin Initialized.");
 }
 
-void LinenPlugin::Deinitialize() {
+void Linen::Deinitialize() {
     std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     // Unload systems in reverse dependency order
@@ -291,7 +291,7 @@ void LinenPlugin::Deinitialize() {
     LOG(Info, "Linen Plugin Deinitialized.");
 }
 
-void LinenPlugin::Update(float deltaTime) {
+void Linen::Update(float deltaTime) {
     // Update all active systems in initialization order
     for (const auto& systemName : m_initializationOrder) {
         auto it = m_activeSystems.find(systemName);
@@ -304,7 +304,7 @@ void LinenPlugin::Update(float deltaTime) {
     m_eventSystem.ProcessEvents();
 }
 
-void LinenPlugin::CalculateInitializationOrder() {
+void Linen::CalculateInitializationOrder() {
     m_initializationOrder.clear();
     
     // Topological sort of systems based on dependencies
@@ -567,7 +567,7 @@ private:
 ### `QuestSystem.cpp`
 ```cpp
 #include "QuestSystem.h"
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "CharacterProgressionSystem.h"
 #include "Engine/Core/Log.h"
 
@@ -888,7 +888,7 @@ private:
 ### `CharacterProgressionSystem.cpp`
 ```cpp
 #include "CharacterProgressionSystem.h"
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "Engine/Core/Log.h"
 
 Skill::Skill(const std::string& id, const std::string& name, const std::string& description)
@@ -1085,7 +1085,7 @@ private:
 ### `SaveLoadSystem.cpp`
 ```cpp
 #include "SaveLoadSystem.h"
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "Engine/Core/Log.h"
 #include <fstream>
 
@@ -1175,14 +1175,14 @@ void SaveLoadSystem::RegisterSerializableSystem(const std::string& systemName) {
 ## Example Usage
 
 ```cpp
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "QuestSystem.h"
 #include "CharacterProgressionSystem.h"
 #include "SaveLoadSystem.h"
 
 void GameInitialization() {
     // Create plugin instance
-    auto plugin = std::make_unique<LinenPlugin>();
+    auto plugin = std::make_unique<Linen>();
     plugin->Initialize();
     
     // Register systems
@@ -1435,7 +1435,7 @@ Now, let's update the RPGSystem classes to implement the ISerializable interface
 #include <unordered_set>
 
 // Forward declarations
-class LinenPlugin;
+class Linen;
 class BinaryReader;
 class BinaryWriter;
 
@@ -1456,14 +1456,14 @@ public:
     virtual std::string GetSystemName() const = 0;
     
     // Plugin reference for accessing other systems
-    void SetPlugin(LinenPlugin* plugin) { m_plugin = plugin; }
+    void SetPlugin(Linen* plugin) { m_plugin = plugin; }
     
     // Default serialization - can be overridden by systems
     virtual void Serialize(BinaryWriter& writer) const override {}
     virtual void Deserialize(BinaryReader& reader) override {}
     
 protected:
-    LinenPlugin* m_plugin = nullptr;
+    Linen* m_plugin = nullptr;
     std::unordered_set<std::string> m_dependencies;
 };
 ```
@@ -1597,7 +1597,7 @@ private:
 ### `SaveLoadSystem.cpp` (updated)
 ```cpp
 #include "SaveLoadSystem.h"
-#include "LinenPlugin.h"
+#include "Linen.h"
 #include "Serialization.h"
 #include "Engine/Core/Log.h"
 #include <chrono>
@@ -1965,9 +1965,9 @@ This prioritization system ensures that critical game events (like player death,
    - **Problem:** Right now, `CalculateInitializationOrder()` sorts dependencies topologically, but it **doesn’t explicitly check for cyclic dependencies before attempting initialization**.
    - **Fix:** Add a **cycle detection step** using depth-first search (DFS) before sorting.
 
-   **Suggested Enhancement (in `LinenPlugin.cpp`)**
+   **Suggested Enhancement (in `Linen.cpp`)**
    ```cpp
-   bool LinenPlugin::DetectCycle(const std::string& systemName, 
+   bool Linen::DetectCycle(const std::string& systemName, 
                                  std::unordered_set<std::string>& visited, 
                                  std::unordered_set<std::string>& recursionStack) {
        if (recursionStack.count(systemName)) return true;  // Cycle detected
@@ -1984,7 +1984,7 @@ This prioritization system ensures that critical game events (like player death,
        return false;
    }
 
-   void LinenPlugin::CalculateInitializationOrder() {
+   void Linen::CalculateInitializationOrder() {
        std::unordered_set<std::string> visited;
        std::unordered_set<std::string> recursionStack;
 

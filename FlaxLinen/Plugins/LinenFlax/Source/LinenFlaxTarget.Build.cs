@@ -1,6 +1,6 @@
 ﻿using Flax.Build;
 
-public class LinenTarget : GameProjectTarget
+public class LinenFlaxTarget : GameProjectTarget
 {
     /// <inheritdoc />
     public override void Init()
@@ -8,6 +8,6 @@ public class LinenTarget : GameProjectTarget
         base.Init();
 
         // Reference the modules for game
-        Modules.Add("Linen");
+        Modules.Add("LinenFlax");
     }
 }

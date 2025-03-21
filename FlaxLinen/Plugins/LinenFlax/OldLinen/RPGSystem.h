@@ -7,7 +7,7 @@
 #include "ILinenSerializable.h"
 
 // Forward declarations
-class LinenPlugin;
+class Linen;
 class BinaryReader;
 class BinaryWriter;
 
@@ -28,13 +28,13 @@ public:
     virtual std::string GetSystemName() const = 0;
     
     // Plugin reference for accessing other systems
-    void SetPlugin(LinenPlugin* plugin) { m_plugin = plugin; }
+    void SetPlugin(Linen* plugin) { m_plugin = plugin; }
     
     // Default serialization - can be overridden by systems
     virtual void Serialize(BinaryWriter& writer) const override {}
     virtual void Deserialize(BinaryReader& reader) override {}
 
 protected:
-    LinenPlugin* m_plugin = nullptr;
+    Linen* m_plugin = nullptr;
     std::unordered_set<std::string> m_dependencies;
 };
