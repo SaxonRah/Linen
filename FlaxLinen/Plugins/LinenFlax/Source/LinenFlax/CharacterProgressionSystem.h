@@ -81,7 +81,7 @@ private:
 
     // Event handlers
     void HandleQuestCompleted(const QuestCompletedEvent& event);
-    
+
     // Singleton Instance
     static CharacterProgressionSystem* s_instance;
 
@@ -90,5 +90,8 @@ private:
     int m_level = 1;
     std::unordered_map<std::string, std::unique_ptr<Skill>> m_skills;
     std::unordered_map<std::string, int> m_skillLevels; // Cache for requirements checking
+    
+    // Thread safety
+    mutable std::mutex m_mutex;
 };
 // ^ CharacterProgressionSystem.h

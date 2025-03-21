@@ -67,7 +67,7 @@ public:
     void Subscribe(std::function<void(const T&)> handler, const std::string& filter = "") {
         static_assert(std::is_base_of<EventType<T>, T>::value, "T must derive from EventType<T>");
 
-        // std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
 
         std::type_index type = std::type_index(typeid(T));
         auto handlerPtr = std::make_shared<EventHandler<T>>(handler);
@@ -84,7 +84,7 @@ public:
     void Publish(const T& event, const std::string& filter = "", EventPriority priority = EventPriority::Normal) {
         static_assert(std::is_base_of<EventType<T>, T>::value, "T must derive from EventType<T>");
 
-        // std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
 
         // Create a shared copy of the event
         auto eventPtr = std::make_shared<T>(event);
@@ -101,7 +101,7 @@ public:
     void PublishImmediate(const T& event, const std::string& filter = "") {
         static_assert(std::is_base_of<EventType<T>, T>::value, "T must derive from EventType<T>");
 
-        // std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
 
         // Create a shared copy of the event
         auto eventPtr = std::make_shared<T>(event);
@@ -127,7 +127,7 @@ public:
         std::vector<QueuedEvent> processingBatch;
 
         {
-            // std::lock_guard<std::mutex> lock(m_mutex);
+            std::lock_guard<std::mutex> lock(m_mutex);
 
             // Move all events from the priority queue to our processing batch
             while (!m_eventQueue.empty()) {
@@ -177,7 +177,7 @@ private:
         }
     };
 
-    // std::mutex m_mutex;
+    std::mutex m_mutex;
     std::unordered_map<std::type_index, std::vector<std::shared_ptr<EventHandlerBase>>> m_handlers;
     std::unordered_map<std::type_index, std::unordered_map<std::string,
         std::vector<std::shared_ptr<EventHandlerBase>>>> m_filteredHandlers;

@@ -12,7 +12,7 @@ void SaveLoadSystem::Initialize() {
 }
 
 void SaveLoadSystem::Shutdown() {
-    // std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::mutex> lock(m_mutex);
     m_serializableSystems.clear();
     LOG(Info, "Save/Load System Shutdown.");
 }
@@ -23,7 +23,7 @@ void SaveLoadSystem::Update(float deltaTime) {
 
 
 bool SaveLoadSystem::SaveGame(const std::string& filename) {
-    // std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::mutex> lock(m_mutex);
     
     // Create a writer object (implementation specific)
     // void* writer = CreateWriter(filename);
@@ -49,7 +49,7 @@ bool SaveLoadSystem::SaveGame(const std::string& filename) {
 }
 
 bool SaveLoadSystem::LoadGame(const std::string& filename) {
-    // std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::mutex> lock(m_mutex);
     
     // Create a reader object (implementation specific)
     // void* reader = CreateReader(filename);
@@ -79,7 +79,7 @@ bool SaveLoadSystem::LoadGame(const std::string& filename) {
 }
 
 void SaveLoadSystem::RegisterSerializableSystem(const std::string& systemName) {
-    // std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::mutex> lock(m_mutex);
     m_serializableSystems.insert(systemName);
     LOG(Info, "Registered system for serialization: {0}", String(systemName.c_str()));
 }

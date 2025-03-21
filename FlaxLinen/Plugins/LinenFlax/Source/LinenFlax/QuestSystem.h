@@ -108,5 +108,8 @@ private:
     
     // Quest storage
     std::unordered_map<std::string, std::unique_ptr<Quest>> m_quests;
+    
+    // Thread safety
+    mutable std::mutex m_mutex;
 };
 // ^ QuestSystem.h

@@ -56,7 +56,7 @@ private:
     static SaveLoadSystem* s_instance;
 
     // Thread safety
-    // std::mutex m_mutex;
+    std::mutex m_mutex;
     
     // Track which systems need serialization
     std::unordered_set<std::string> m_serializableSystems;

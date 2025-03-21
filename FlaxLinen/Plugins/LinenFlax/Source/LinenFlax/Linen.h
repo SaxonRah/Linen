@@ -154,7 +154,7 @@ private:
     std::unordered_map<std::type_index, std::string> m_typeToName;
 
     // Thread safety
-    // std::mutex m_systemsMutex;
+    std::mutex m_systemsMutex;
 
     // Centralized event system
     EventSystem m_eventSystem;
@@ -165,7 +165,7 @@ template <typename T>
 bool Linen::RegisterSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    // std::lock_guard<std::mutex> lock(m_systemsMutex);
+    std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto system = std::make_unique<T>();
     std::string systemName = system->GetName();
@@ -193,7 +193,7 @@ template <typename T>
 bool Linen::LoadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    // std::lock_guard<std::mutex> lock(m_systemsMutex);
+    std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto typeIndex = std::type_index(typeid(T));
     
@@ -247,7 +247,7 @@ template <typename T>
 bool Linen::UnloadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    // std::lock_guard<std::mutex> lock(m_systemsMutex);
+    std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto typeIndex = std::type_index(typeid(T));
     if (m_typeToName.find(typeIndex) == m_typeToName.end()) {
@@ -286,7 +286,7 @@ template <typename T>
 T* Linen::GetSystemOld() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
-    // std::lock_guard<std::mutex> lock(m_systemsMutex);
+    std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto typeIndex = std::type_index(typeid(T));
     if (m_typeToName.find(typeIndex) == m_typeToName.end()) {
@@ -306,7 +306,7 @@ template <typename T>
 T* Linen::GetSystemOld(const std::string& systemName) {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
 
-    // std::lock_guard<std::mutex> lock(m_systemsMutex);
+    std::lock_guard<std::mutex> lock(m_systemsMutex);
 
     auto it = m_activeSystems.find(systemName);
     if (it == m_activeSystems.end()) {
