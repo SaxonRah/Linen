@@ -8,7 +8,7 @@
 #include "LinenSystem.h"
 
 // Forward declaration
-class Linen;
+class LinenFlax;
 class BinaryReader;
 class BinaryWriter;
 
@@ -21,10 +21,10 @@ public:
     const std::unordered_set<std::string>& GetDependencies() const { return m_dependencies; }
     
     // Plugin reference for accessing other systems
-    void SetPlugin(Linen* plugin) { m_plugin = plugin; }
+    void SetPlugin(LinenFlax* plugin) { m_plugin = plugin; }
 
 protected:
-    Linen* m_plugin = nullptr;
+    LinenFlax* m_plugin = nullptr;
     std::unordered_set<std::string> m_dependencies;
 };
 // ^ RPGSystem.h

@@ -1,7 +1,7 @@
 // v CharacterProgressionSystem.cpp
 #include "CharacterProgressionSystem.h"
 #include "QuestEvents.h"
-#include "Linen.h"
+#include "LinenFlax.h"
 #include "Engine/Core/Log.h"
 
 Skill::Skill(const std::string& id, const std::string& name, const std::string& description)

@@ -1,4 +1,4 @@
-// v Linen.h
+// v LinenFlax.h
 #pragma once
 
 #include "Engine/Scripting/Plugins/GamePlugin.h"
@@ -105,16 +105,16 @@ public:
     }
 };
 
-API_CLASS(Namespace="ParabolicLabs") class LINENFLAX_API Linen : public GamePlugin
+API_CLASS(Namespace="ParabolicLabs") class LINENFLAX_API LinenFlax : public GamePlugin
 {
     
-DECLARE_SCRIPTING_TYPE(Linen);
+DECLARE_SCRIPTING_TYPE(LinenFlax);
 
 public:
         
     // Delete copy operations
-    Linen(const Linen&) = delete;
-    Linen& operator=(const Linen&) = delete;
+    LinenFlax(const LinenFlax&) = delete;
+    LinenFlax& operator=(const LinenFlax&) = delete;
 
     // Core plugin lifecycle
     void Initialize() override;
@@ -169,7 +169,7 @@ private:
 
 // Template implementations
 template <typename T>
-T* Linen::GetSystem() {
+T* LinenFlax::GetSystem() {
     // C++17 compatible implementation
     if constexpr (std::is_same<T, TestSystem>::value) {
         return TestSystem::GetInstance();
@@ -184,12 +184,12 @@ T* Linen::GetSystem() {
         return SaveLoadSystem::GetInstance();
     }
     
-    LOG(Warning, "Linen::GetSystem : No matching system found for type {0}", String(typeid(T).name()));
+    LOG(Warning, "LinenFlax::GetSystem : No matching system found for type {0}", String(typeid(T).name()));
     return nullptr;
 }
 
 template <typename T>
-bool Linen::RegisterSystem() {
+bool LinenFlax::RegisterSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
     auto system = std::make_unique<T>();
@@ -215,7 +215,7 @@ bool Linen::RegisterSystem() {
 }
 
 template <typename T>
-bool Linen::LoadSystem() {
+bool LinenFlax::LoadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
    
     auto typeIndex = std::type_index(typeid(T));
@@ -267,7 +267,7 @@ bool Linen::LoadSystem() {
 }
 
 template <typename T>
-bool Linen::UnloadSystem() {
+bool LinenFlax::UnloadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
     
     auto typeIndex = std::type_index(typeid(T));
@@ -302,4 +302,4 @@ bool Linen::UnloadSystem() {
     LOG(Info, "Unloaded system: {0}", String(systemName.c_str()));
     return true;
 }
-// ^ Linen.h
+// ^ LinenFlax.h

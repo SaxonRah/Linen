@@ -1,24 +1,24 @@
-// v Linen.cpp
-#include "Linen.h"
+// v LinenFlax.cpp
+#include "LinenFlax.h"
 #include "LinenSystemIncludes.h" // Include all systems
 #include "Engine/Core/Log.h"
 
-Linen::Linen(const SpawnParams& params) : GamePlugin(params)
+LinenFlax::LinenFlax(const SpawnParams& params) : GamePlugin(params)
 {
-    _description.Name = TEXT("Linen");
+    _description.Name = TEXT("LinenFlax");
 #if USE_EDITOR
     _description.Category = TEXT("Gameplay");
-    _description.Description = TEXT("Linen plugin");
+    _description.Description = TEXT("LinenFlax plugin");
     _description.Author = TEXT("ParabolicLabs");
     _description.RepositoryUrl = TEXT("");
 #endif
     _description.Version = Version(1, 0, 0);
 }
 
-void Linen::Initialize() {
+void LinenFlax::Initialize() {
     GamePlugin::Initialize();
     
-    LOG(Info, "Linen::Initialize : ran");
+    LOG(Info, "LinenFlax::Initialize : ran");
 
     // Set plugin references first
     TestSystem::GetInstance()->SetPlugin(this);
@@ -32,11 +32,11 @@ void Linen::Initialize() {
     QuestSystem::GetInstance()->Initialize();
     SaveLoadSystem::GetInstance()->Initialize();
     
-    LOG(Info, "All Linen RPG Systems initialized");
+    LOG(Info, "All LinenFlax RPG Systems initialized");
 }
 
-void Linen::Deinitialize() {
-    LOG(Info, "Linen::Deinitialize : ran");
+void LinenFlax::Deinitialize() {
+    LOG(Info, "LinenFlax::Deinitialize : ran");
     
     // Shutdown systems in reverse order
     SaveLoadSystem::GetInstance()->Shutdown();
@@ -44,11 +44,11 @@ void Linen::Deinitialize() {
     CharacterProgressionSystem::GetInstance()->Shutdown();
     TestSystem::GetInstance()->Shutdown();
 
-    LOG(Info, "Linen Plugin Deinitialized.");
+    LOG(Info, "LinenFlax Plugin Deinitialized.");
     GamePlugin::Deinitialize();
 }
 
-void Linen::Update(float deltaTime) {
+void LinenFlax::Update(float deltaTime) {
     // Update all singleton systems
     TestSystem::GetInstance()->Update(deltaTime);
     CharacterProgressionSystem::GetInstance()->Update(deltaTime);
@@ -59,7 +59,7 @@ void Linen::Update(float deltaTime) {
     m_eventSystem.ProcessEvents();
 }
 
-bool Linen::DetectCycle(const std::string& systemName, 
+bool LinenFlax::DetectCycle(const std::string& systemName, 
     std::unordered_set<std::string>& visited, 
     std::unordered_set<std::string>& recursionStack) {
     if (recursionStack.count(systemName)) return true;  // Cycle detected
@@ -76,7 +76,7 @@ bool Linen::DetectCycle(const std::string& systemName,
     return false;
 }
 
-void Linen::CalculateInitializationOrder() {
+void LinenFlax::CalculateInitializationOrder() {
     m_initializationOrder.clear();
     
     // Topological sort of systems based on dependencies
@@ -103,7 +103,7 @@ void Linen::CalculateInitializationOrder() {
 }
 
 // Implement the member function
-void Linen::VisitSystem(const std::string& systemName,
+void LinenFlax::VisitSystem(const std::string& systemName,
                       std::unordered_set<std::string>& visited,
                       std::unordered_set<std::string>& inProgress) {
     if (inProgress.find(systemName) != inProgress.end()) {
@@ -128,4 +128,4 @@ void Linen::VisitSystem(const std::string& systemName,
     visited.insert(systemName);
     m_initializationOrder.push_back(systemName);
 }
-// ^ Linen.cpp
+// ^ LinenFlax.cpp

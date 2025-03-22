@@ -1,7 +1,7 @@
 // v QuestSystem.cpp
 #include "QuestSystem.h"
 #include "CharacterProgressionSystem.h"
-#include "Linen.h"
+#include "LinenFlax.h"
 #include "Engine/Core/Log.h"
 
 // QuestSystem* QuestSystem::s_instance = nullptr;

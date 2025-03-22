@@ -1,6 +1,6 @@
 // v LinenTest.cpp
 #include "LinenTest.h"
-#include "Linen.h"
+#include "LinenFlax.h"
 #include "LinenSystemIncludes.h"
 #include "Engine/Core/Log.h"
 #include "Engine/Scripting/Plugins/PluginManager.h"
@@ -17,8 +17,8 @@ void LinenTest::OnEnable()
         LOG(Info, "LinenTest::OnEnable : Starting LinenTest");
 
         // Try to get the plugin from the PluginManager
-        auto* plugin = PluginManager::GetPlugin<Linen>();
-        if (plugin && typeid(*plugin) == typeid(Linen)) {
+        auto* plugin = PluginManager::GetPlugin<LinenFlax>();
+        if (plugin && typeid(*plugin) == typeid(LinenFlax)) {
 
             // Test CharacterProgressionSystem functionality
             auto* characterProgressionSystem = plugin->GetSystem<CharacterProgressionSystem>();
