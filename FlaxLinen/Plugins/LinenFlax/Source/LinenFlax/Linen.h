@@ -20,8 +20,11 @@ class TestSystem;
 class CharacterProgressionSystem;
 class QuestSystem;
 class SaveLoadSystem;
+
 class BinaryReader;
 class BinaryWriter;
+class TextWriter;
+class TextReader;
 
 // Example test system
 class TestSystem : public RPGSystem {
@@ -54,13 +57,23 @@ public:
     std::string GetName() const override { return "TestSystem"; }
     
     void Serialize(BinaryWriter& writer) const override {
-        // Simple implementation
-        // writer.Write(_testValue);
+        writer.Write(_testValue);
+        LOG(Info, "TestSystem serialized with value: {0}", _testValue);
     }
     
     void Deserialize(BinaryReader& reader) override {
-        // Simple implementation
-        // reader.Read(_testValue);
+        reader.Read(_testValue);
+        LOG(Info, "TestSystem deserialized with value: {0}", _testValue);
+    }
+    
+    void SerializeToText(TextWriter& writer) const {
+        writer.Write("testValue", _testValue);
+        LOG(Info, "TestSystem serialized to text with value: {0}", _testValue);
+    }
+    
+    void DeserializeFromText(TextReader& reader) {
+        reader.Read("testValue", _testValue);
+        LOG(Info, "TestSystem deserialized from text with value: {0}", _testValue);
     }
     
     // GetInstance method

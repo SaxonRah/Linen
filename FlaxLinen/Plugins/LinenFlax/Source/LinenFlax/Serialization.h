@@ -1,13 +1,17 @@
 // v Serialization.h
-
 #pragma once
 
-#include "LinenSystem.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <fstream>
 #include <cstdint>
+#include <sstream>
+
+enum class SerializationFormat {
+    Binary,
+    Text
+};
 
 class BinaryWriter {
 public:
@@ -44,16 +48,6 @@ public:
         Write(size);
         for (const auto& item : vec) {
             Write(item);
-        }
-    }
-    
-    // Write vector of serializable objects
-    template<typename T>
-    void WriteSerializableVector(const std::vector<std::unique_ptr<T>>& vec) {
-        uint32_t size = static_cast<uint32_t>(vec.size());
-        Write(size);
-        for (const auto& item : vec) {
-            item->Serialize(*this);
         }
     }
     
@@ -112,19 +106,6 @@ public:
         }
     }
     
-    // Read vector of serializable objects
-    template<typename T>
-    void ReadSerializableVector(std::vector<std::unique_ptr<T>>& vec) {
-        uint32_t size = 0;
-        Read(size);
-        vec.clear();
-        for (uint32_t i = 0; i < size; ++i) {
-            auto item = std::make_unique<T>();
-            item->Deserialize(*this);
-            vec.push_back(std::move(item));
-        }
-    }
-    
     // Read map
     template<typename K, typename V>
     void ReadMap(std::unordered_map<K, V>& map) {
@@ -142,5 +123,180 @@ public:
     
 private:
     std::ifstream m_stream;
+};
+
+// Simple text-based serialization
+class TextWriter {
+public:
+    TextWriter() {}
+    
+    // Generic value writing template
+    template<typename T>
+    void Write(const std::string& key, const T& value) {
+        std::stringstream ss;
+        ss << value;
+        m_data[key] = ss.str();
+    }
+    
+    // Specialization for strings (to avoid the to_string error)
+    void Write(const std::string& key, const std::string& value) {
+        m_data[key] = value;
+    }
+    
+    // Specialization for string literals
+    void Write(const std::string& key, const char* value) {
+        m_data[key] = value;
+    }
+    
+    // Write vector as comma-separated values
+    template<typename T>
+    void WriteVector(const std::string& key, const std::vector<T>& vec) {
+        std::stringstream ss;
+        for (size_t i = 0; i < vec.size(); ++i) {
+            ss << vec[i];
+            if (i < vec.size() - 1) {
+                ss << ",";
+            }
+        }
+        m_data[key] = ss.str();
+    }
+    
+    // Write map as key-value pairs
+    template<typename V>
+    void WriteMap(const std::string& key, const std::unordered_map<std::string, V>& map) {
+        std::stringstream ss;
+        size_t index = 0;
+        for (const auto& pair : map) {
+            ss << pair.first << "=" << pair.second;
+            if (index < map.size() - 1) {
+                ss << ";";
+            }
+            index++;
+        }
+        m_data[key] = ss.str();
+    }
+    
+    bool SaveToFile(const std::string& filename) {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Write in a simple key=value format
+        for (const auto& pair : m_data) {
+            file << pair.first << "=" << pair.second << std::endl;
+        }
+        file.close();
+        return true;
+    }
+    
+private:
+    std::unordered_map<std::string, std::string> m_data;
+};
+
+class TextReader {
+public:
+    TextReader() {}
+    
+    bool LoadFromFile(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = line.substr(0, pos);
+                std::string value = line.substr(pos + 1);
+                m_data[key] = value;
+            }
+        }
+        file.close();
+        return true;
+    }
+    
+    template<typename T>
+    bool Read(const std::string& key, T& value) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        std::stringstream ss(it->second);
+        ss >> value;
+        return !ss.fail();
+    }
+    
+    // Specialization for strings
+    bool Read(const std::string& key, std::string& value) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        value = it->second;
+        return true;
+    }
+    
+    // Read vector from comma-separated values
+    template<typename T>
+    bool ReadVector(const std::string& key, std::vector<T>& vec) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        std::string value = it->second;
+        std::stringstream ss(value);
+        std::string item;
+        vec.clear();
+        
+        while (std::getline(ss, item, ',')) {
+            T val;
+            std::stringstream itemSS(item);
+            itemSS >> val;
+            if (!itemSS.fail()) {
+                vec.push_back(val);
+            }
+        }
+        
+        return true;
+    }
+    
+    // Read map from key-value pairs
+    template<typename V>
+    bool ReadMap(const std::string& key, std::unordered_map<std::string, V>& map) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        std::string value = it->second;
+        std::stringstream ss(value);
+        std::string pair;
+        map.clear();
+        
+        while (std::getline(ss, pair, ';')) {
+            size_t pos = pair.find('=');
+            if (pos != std::string::npos) {
+                std::string mapKey = pair.substr(0, pos);
+                std::string mapValue = pair.substr(pos + 1);
+                
+                V val;
+                std::stringstream valSS(mapValue);
+                valSS >> val;
+                if (!valSS.fail()) {
+                    map[mapKey] = val;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+private:
+    std::unordered_map<std::string, std::string> m_data;
 };
 // ^ Serialization.h

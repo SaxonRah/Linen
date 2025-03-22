@@ -11,6 +11,37 @@ Skill::Skill(const std::string& id, const std::string& name, const std::string& 
     , m_level(0)
 {
 }
+// Skill binary serialization
+void Skill::Serialize(BinaryWriter& writer) const {
+    writer.Write(m_id);
+    writer.Write(m_name);
+    writer.Write(m_description);
+    writer.Write(m_level);
+}
+
+// Skill binary deserialization
+void Skill::Deserialize(BinaryReader& reader) {
+    reader.Read(m_id);
+    reader.Read(m_name);
+    reader.Read(m_description);
+    reader.Read(m_level);
+}
+
+// Skill text serialization
+void Skill::SerializeToText(TextWriter& writer) const {
+    writer.Write("skillId", m_id);
+    writer.Write("skillName", m_name);
+    writer.Write("skillDescription", m_description);
+    writer.Write("skillLevel", m_level);
+}
+
+// Skill text deserialization
+void Skill::DeserializeFromText(TextReader& reader) {
+    reader.Read("skillId", m_id);
+    reader.Read("skillName", m_name);
+    reader.Read("skillDescription", m_description);
+    reader.Read("skillLevel", m_level);
+}
 
 CharacterProgressionSystem::CharacterProgressionSystem() {
     // Initialize member variables if needed
@@ -115,10 +146,159 @@ void CharacterProgressionSystem::HandleQuestCompleted(const QuestCompletedEvent&
 }
 
 void CharacterProgressionSystem::Serialize(BinaryWriter& writer) const {
-    // Implementation
+    // Write basic character data
+    writer.Write(m_experience);
+    writer.Write(m_level);
+    
+    // Write skills
+    writer.Write(static_cast<uint32_t>(m_skills.size()));
+    for (const auto& pair : m_skills) {
+        writer.Write(pair.first);  // Skill ID
+        writer.Write(pair.second->GetId());
+        writer.Write(pair.second->GetName());
+        writer.Write(pair.second->GetDescription());
+        writer.Write(pair.second->GetLevel());
+    }
+    
+    // Write skill levels cache
+    writer.Write(static_cast<uint32_t>(m_skillLevels.size()));
+    for (const auto& pair : m_skillLevels) {
+        writer.Write(pair.first);  // Skill ID
+        writer.Write(pair.second); // Skill level
+    }
+    
+    LOG(Info, "CharacterProgressionSystem serialized");
 }
 
+// CharacterProgressionSystem binary deserialization
 void CharacterProgressionSystem::Deserialize(BinaryReader& reader) {
-    // Implementation
+    // Clear existing data
+    m_skills.clear();
+    m_skillLevels.clear();
+    
+    // Read basic character data
+    reader.Read(m_experience);
+    reader.Read(m_level);
+    
+    // Read skills
+    uint32_t skillCount = 0;
+    reader.Read(skillCount);
+    
+    for (uint32_t i = 0; i < skillCount; ++i) {
+        std::string skillId;
+        reader.Read(skillId);
+        
+        std::string id, name, description;
+        int level;
+        reader.Read(id);
+        reader.Read(name);
+        reader.Read(description);
+        reader.Read(level);
+        
+        auto skill = std::make_unique<Skill>(id, name, description);
+        skill->SetLevel(level);
+        
+        m_skills[skillId] = std::move(skill);
+    }
+    
+    // Read skill levels cache
+    uint32_t levelCount = 0;
+    reader.Read(levelCount);
+    
+    for (uint32_t i = 0; i < levelCount; ++i) {
+        std::string skillId;
+        int level = 0;
+        reader.Read(skillId);
+        reader.Read(level);
+        m_skillLevels[skillId] = level;
+    }
+    
+    LOG(Info, "CharacterProgressionSystem deserialized");
+}
+
+// CharacterProgressionSystem text serialization
+void CharacterProgressionSystem::SerializeToText(TextWriter& writer) const {
+    // Write basic character data
+    writer.Write("characterExperience", m_experience);
+    writer.Write("characterLevel", m_level);
+    
+    // Write skill count
+    writer.Write("skillCount", static_cast<int>(m_skills.size()));
+    
+    // Write each skill
+    int index = 0;
+    for (const auto& pair : m_skills) {
+        std::string prefix = "skill" + std::to_string(index) + "_";
+        writer.Write(prefix + "id", pair.first);
+        writer.Write(prefix + "name", pair.second->GetName());
+        writer.Write(prefix + "description", pair.second->GetDescription());
+        writer.Write(prefix + "level", pair.second->GetLevel());
+        index++;
+    }
+    
+    // Write skill levels count
+    writer.Write("skillLevelsCount", static_cast<int>(m_skillLevels.size()));
+    
+    // Write skill levels
+    index = 0;
+    for (const auto& pair : m_skillLevels) {
+        std::string prefix = "skillLevel" + std::to_string(index) + "_";
+        writer.Write(prefix + "id", pair.first);
+        writer.Write(prefix + "level", pair.second);
+        index++;
+    }
+    
+    LOG(Info, "CharacterProgressionSystem serialized to text");
+}
+
+void CharacterProgressionSystem::DeserializeFromText(TextReader& reader) {
+    // Clear existing data
+    m_skills.clear();
+    m_skillLevels.clear();
+    
+    // Read basic character data
+    reader.Read("characterExperience", m_experience);
+    reader.Read("characterLevel", m_level);
+    
+    // Read skill count
+    int skillCount = 0;
+    reader.Read("skillCount", skillCount);
+    
+    // Read each skill
+    for (int i = 0; i < skillCount; i++) {
+        std::string prefix = "skill" + std::to_string(i) + "_";
+        
+        std::string id, name, description;
+        int level = 0;
+        
+        reader.Read(prefix + "id", id);
+        reader.Read(prefix + "name", name);
+        reader.Read(prefix + "description", description);
+        reader.Read(prefix + "level", level);
+        
+        auto skill = std::make_unique<Skill>(id, name, description);
+        skill->SetLevel(level);
+        
+        m_skills[id] = std::move(skill);
+    }
+    
+    // Read skill levels count
+    int skillLevelsCount = 0;
+    reader.Read("skillLevelsCount", skillLevelsCount);
+    
+    // Read skill levels
+    for (int i = 0; i < skillLevelsCount; i++) {
+        std::string prefix = "skillLevel" + std::to_string(i) + "_";
+        
+        std::string id;
+        int level = 0;
+        
+        reader.Read(prefix + "id", id);
+        reader.Read(prefix + "level", level);
+        
+        m_skillLevels[id] = level;
+    }
+    
+    LOG(Info, "CharacterProgressionSystem deserialized from text");
 }
 // ^ CharacterProgressionSystem.cpp

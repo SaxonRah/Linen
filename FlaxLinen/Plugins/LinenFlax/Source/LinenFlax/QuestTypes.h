@@ -11,4 +11,13 @@ enum class QuestState {
     Completed,
     Failed
 };
+
+enum class QuestResult {
+    Success,            
+    NotFound,           // Quest ID not found
+    AlreadyExists,      // When trying to add a quest that already exists
+    InvalidState,       // Quest is in wrong state for the operation
+    RequirementsNotMet, // Player doesn't meet skill requirements
+    Error               // Generic error
+};
 // ^ QuestTypes.h

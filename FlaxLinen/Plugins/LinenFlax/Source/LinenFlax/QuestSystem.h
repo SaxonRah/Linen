@@ -14,15 +14,6 @@
 // Forward declaration
 class CharacterProgressionSystem;
 
-enum class QuestResult {
-    Success,            
-    NotFound,           // Quest ID not found
-    AlreadyExists,      // When trying to add a quest that already exists
-    InvalidState,       // Quest is in wrong state for the operation
-    RequirementsNotMet, // Player doesn't meet skill requirements
-    Error               // Generic error
-};
-
 class Quest {
 public:
     Quest(const std::string& id, const std::string& title, const std::string& description);
@@ -42,10 +33,13 @@ public:
     
     // Check if player meets skill requirements
     bool CheckRequirements(const std::unordered_map<std::string, int>& playerSkills) const;
-    
+    const std::unordered_map<std::string, int>& GetSkillRequirements() const { return m_skillRequirements; }
+
     // For serialization
-    virtual void Serialize(void* writer) const;
-    virtual void Deserialize(void* reader);
+    void Serialize(BinaryWriter& writer) const;
+    void Deserialize(BinaryReader& reader);
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
     
 private:
     std::string m_id;
@@ -72,10 +66,6 @@ public:
     // Implement GetName from LinenSystem
     std::string GetName() const override { return "QuestSystem"; }
     
-    // Serialization override
-    void Serialize(BinaryWriter& writer) const override;
-    void Deserialize(BinaryReader& reader) override;
-    
     // Quest management
     QuestResult AddQuest(const std::string& id, const std::string& title, const std::string& description);
     QuestResult ActivateQuest(const std::string& id);
@@ -89,6 +79,12 @@ public:
     std::vector<Quest*> GetCompletedQuests() const;
     std::vector<Quest*> GetFailedQuests() const;
     
+    // Serialization override
+    void Serialize(BinaryWriter& writer) const override;
+    void Deserialize(BinaryReader& reader) override;
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
+
     // Meyer's Singleton - thread-safe in C++11 and beyond
     static QuestSystem* GetInstance() {
         // Thread-safe in C++11 and beyond

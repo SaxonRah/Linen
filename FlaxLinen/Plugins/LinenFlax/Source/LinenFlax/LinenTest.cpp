@@ -125,8 +125,14 @@ void LinenTest::OnEnable()
             auto* saveLoadSystem = plugin->GetSystem<SaveLoadSystem>();
             if (saveLoadSystem) {
                 LOG(Info, "LinenTest::OnEnable : Save Load System loaded");
-                saveLoadSystem->SaveGame("TestSave.sav");
-                saveLoadSystem->LoadGame("TestSave.sav");
+                
+                // Test binary serialization
+                saveLoadSystem->SaveGame("TestSave.bin", SerializationFormat::Binary);
+                saveLoadSystem->LoadGame("TestSave.bin", SerializationFormat::Binary);
+                
+                // Test text serialization
+                saveLoadSystem->SaveGame("TestSave.txt", SerializationFormat::Text);
+                saveLoadSystem->LoadGame("TestSave.txt", SerializationFormat::Text);
             }
             else {
                 LOG(Warning, "LinenTest::OnEnable : Save Load System not found");

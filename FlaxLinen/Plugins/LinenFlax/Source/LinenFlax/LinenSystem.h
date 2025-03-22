@@ -1,9 +1,7 @@
 // v LinenSystem.h
 #pragma once
 #include <string>
-
-class BinaryReader;
-class BinaryWriter;
+#include "Serialization.h"
 
 // Simple base system class
 class LinenSystem {
@@ -17,5 +15,8 @@ public:
     // Serialization methods
     virtual void Serialize(BinaryWriter& writer) const { /* Default empty implementation */ }
     virtual void Deserialize(BinaryReader& reader) { /* Default empty implementation */ }
+    virtual void SerializeToText(TextWriter& writer) const { /* Default empty implementation */ }
+    virtual void DeserializeFromText(TextReader& reader) { /* Default empty implementation */ }
+
 };
 // ^ LinenSystem.h

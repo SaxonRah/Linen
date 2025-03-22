@@ -22,6 +22,11 @@ public:
     void SetLevel(int level) { m_level = level; }
     void IncreaseLevel(int amount = 1) { m_level += amount; }
     
+    void Serialize(BinaryWriter& writer) const;
+    void Deserialize(BinaryReader& reader);
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
+
 private:
     std::string m_id;
     std::string m_name;
@@ -49,23 +54,25 @@ public:
     
     // Implement GetName from LinenSystem
     std::string GetName() const override { return "CharacterProgressionSystem"; }
-    
-    // Serialization override
-    void Serialize(BinaryWriter& writer) const override;
-    void Deserialize(BinaryReader& reader) override;
-    
+
     // Skill management
     bool AddSkill(const std::string& id, const std::string& name, const std::string& description);
     bool IncreaseSkill(const std::string& id, int amount = 1);
     int GetSkillLevel(const std::string& id) const;
     
+    // Requirements checking
+    const std::unordered_map<std::string, int>& GetSkills() const;
+
     // Experience management
     void GainExperience(int amount);
     int GetExperience() const;
     int GetLevel() const;
     
-    // Requirements checking
-    const std::unordered_map<std::string, int>& GetSkills() const;
+    // Serialization override
+    void Serialize(BinaryWriter& writer) const override;
+    void Deserialize(BinaryReader& reader) override;
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
     
     // Cleanup method
     static void Destroy() {

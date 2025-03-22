@@ -30,12 +30,94 @@ bool Quest::CheckRequirements(const std::unordered_map<std::string, int>& player
     return true;
 }
 
-void Quest::Serialize(void* writer) const {
-    // Serialization implementation
+void Quest::Serialize(BinaryWriter& writer) const {
+    writer.Write(m_id);
+    writer.Write(m_title);
+    writer.Write(m_description);
+    writer.Write(static_cast<int32_t>(m_state));
+    writer.Write(m_experienceReward);
+    
+    // Write skill requirements
+    writer.Write(static_cast<uint32_t>(m_skillRequirements.size()));
+    for (const auto& pair : m_skillRequirements) {
+        writer.Write(pair.first);  // Skill name
+        writer.Write(pair.second); // Required level
+    }
 }
 
-void Quest::Deserialize(void* reader) {
-    // Deserialization implementation
+void Quest::Deserialize(BinaryReader& reader) {
+    reader.Read(m_id);
+    reader.Read(m_title);
+    reader.Read(m_description);
+    
+    int32_t stateValue = 0;
+    reader.Read(stateValue);
+    m_state = static_cast<QuestState>(stateValue);
+    
+    reader.Read(m_experienceReward);
+    
+    // Read skill requirements
+    uint32_t requirementCount = 0;
+    reader.Read(requirementCount);
+    
+    m_skillRequirements.clear();
+    for (uint32_t i = 0; i < requirementCount; ++i) {
+        std::string skillName;
+        int requiredLevel = 0;
+        reader.Read(skillName);
+        reader.Read(requiredLevel);
+        m_skillRequirements[skillName] = requiredLevel;
+    }
+}
+
+void Quest::SerializeToText(TextWriter& writer) const {
+    writer.Write("questId", m_id);
+    writer.Write("questTitle", m_title);
+    writer.Write("questDescription", m_description);
+    writer.Write("questState", static_cast<int>(m_state));
+    writer.Write("questExperienceReward", m_experienceReward);
+    
+    // Write skill requirements count
+    writer.Write("questSkillReqCount", static_cast<int>(m_skillRequirements.size()));
+    
+    // Write each skill requirement
+    int index = 0;
+    for (const auto& pair : m_skillRequirements) {
+        std::string prefix = "questSkillReq" + std::to_string(index) + "_";
+        writer.Write(prefix + "skill", pair.first);
+        writer.Write(prefix + "level", pair.second);
+        index++;
+    }
+}
+
+// Quest text deserialization
+void Quest::DeserializeFromText(TextReader& reader) {
+    reader.Read("questId", m_id);
+    reader.Read("questTitle", m_title);
+    reader.Read("questDescription", m_description);
+    
+    int state = 0;
+    reader.Read("questState", state);
+    m_state = static_cast<QuestState>(state);
+    
+    reader.Read("questExperienceReward", m_experienceReward);
+    
+    // Read skill requirements
+    int reqCount = 0;
+    reader.Read("questSkillReqCount", reqCount);
+    
+    m_skillRequirements.clear();
+    for (int i = 0; i < reqCount; i++) {
+        std::string prefix = "questSkillReq" + std::to_string(i) + "_";
+        
+        std::string skillName;
+        int requiredLevel = 0;
+        
+        reader.Read(prefix + "skill", skillName);
+        reader.Read(prefix + "level", requiredLevel);
+        
+        m_skillRequirements[skillName] = requiredLevel;
+    }
 }
 
 QuestSystem::QuestSystem() {
@@ -254,10 +336,121 @@ std::vector<Quest*> QuestSystem::GetFailedQuests() const {
 }
 
 void QuestSystem::Serialize(BinaryWriter& writer) const {
-    // Implementation
+    // Write quests
+    writer.Write(static_cast<uint32_t>(m_quests.size()));
+    for (const auto& pair : m_quests) {
+        writer.Write(pair.first);  // Quest ID
+        
+        // Write quest data
+        writer.Write(pair.second->GetId());
+        writer.Write(pair.second->GetTitle());
+        writer.Write(pair.second->GetDescription());
+        writer.Write(static_cast<int32_t>(pair.second->GetState()));
+        writer.Write(pair.second->GetExperienceReward());
+        
+        // Write skill requirements
+        auto quest = pair.second.get();
+        const auto& reqMap = quest->GetSkillRequirements();
+        writer.Write(static_cast<uint32_t>(reqMap.size()));
+        
+        for (const auto& reqPair : reqMap) {
+            writer.Write(reqPair.first);  // Skill name
+            writer.Write(reqPair.second); // Required level
+        }
+    }
+    
+    LOG(Info, "QuestSystem serialized");
 }
 
 void QuestSystem::Deserialize(BinaryReader& reader) {
-    // Implementation
+    // Clear existing data
+    m_quests.clear();
+    
+    // Read quests
+    uint32_t questCount = 0;
+    reader.Read(questCount);
+    
+    for (uint32_t i = 0; i < questCount; ++i) {
+        std::string questId;
+        reader.Read(questId);
+        
+        // Read quest data
+        std::string id, title, description;
+        int32_t stateValue = 0;
+        int expReward = 0;
+        
+        reader.Read(id);
+        reader.Read(title);
+        reader.Read(description);
+        reader.Read(stateValue);
+        reader.Read(expReward);
+        
+        // Create quest
+        auto quest = std::make_unique<Quest>(id, title, description);
+        quest->SetState(static_cast<QuestState>(stateValue));
+        quest->SetExperienceReward(expReward);
+        
+        // Read skill requirements
+        uint32_t reqCount = 0;
+        reader.Read(reqCount);
+        
+        for (uint32_t j = 0; j < reqCount; ++j) {
+            std::string skillName;
+            int requiredLevel = 0;
+            reader.Read(skillName);
+            reader.Read(requiredLevel);
+            quest->AddSkillRequirement(skillName, requiredLevel);
+        }
+        
+        m_quests[questId] = std::move(quest);
+    }
+    
+    LOG(Info, "QuestSystem deserialized");
+}
+
+void QuestSystem::SerializeToText(TextWriter& writer) const {
+    // Write quest count
+    writer.Write("questCount", static_cast<int>(m_quests.size()));
+    
+    // Write each quest
+    int index = 0;
+    for (const auto& pair : m_quests) {
+        std::string prefix = "quest" + std::to_string(index) + "_";
+        writer.Write(prefix + "id", pair.first);
+        
+        // Let the quest serialize itself with the prefix
+        pair.second->SerializeToText(writer);
+        
+        index++;
+    }
+    
+    LOG(Info, "QuestSystem serialized to text");
+}
+
+void QuestSystem::DeserializeFromText(TextReader& reader) {
+    // Clear existing data
+    m_quests.clear();
+    
+    // Read quest count
+    int questCount = 0;
+    reader.Read("questCount", questCount);
+    
+    // Read each quest
+    for (int i = 0; i < questCount; i++) {
+        std::string prefix = "quest" + std::to_string(i) + "_";
+        
+        std::string questId;
+        reader.Read(prefix + "id", questId);
+        
+        // Create a placeholder quest
+        auto quest = std::make_unique<Quest>("", "", "");
+        
+        // Let the quest deserialize itself
+        quest->DeserializeFromText(reader);
+        
+        m_quests[questId] = std::move(quest);
+    }
+    
+    LOG(Info, "QuestSystem deserialized from text");
 }
 // ^ QuestSystem.cpp
