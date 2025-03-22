@@ -87,6 +87,7 @@ public:
     std::vector<Quest*> GetAvailableQuests() const;
     std::vector<Quest*> GetActiveQuests() const;
     std::vector<Quest*> GetCompletedQuests() const;
+    std::vector<Quest*> GetFailedQuests() const;
     
     // Meyer's Singleton - thread-safe in C++11 and beyond
     static QuestSystem* GetInstance() {

@@ -3,8 +3,6 @@
 #include "LinenSystemIncludes.h" // Include all systems
 #include "Engine/Core/Log.h"
 
-// IMPLEMENT_GAME_PLUGIN(Linen, "Linen", "1.0", "ParabolicLabs");
-
 Linen::Linen(const SpawnParams& params) : GamePlugin(params)
 {
     _description.Name = TEXT("Linen");
@@ -26,11 +24,13 @@ void Linen::Initialize() {
     TestSystem::GetInstance()->SetPlugin(this);
     CharacterProgressionSystem::GetInstance()->SetPlugin(this);
     QuestSystem::GetInstance()->SetPlugin(this);
+    SaveLoadSystem::GetInstance()->SetPlugin(this);
     
     // Then initialize systems in dependency order
     TestSystem::GetInstance()->Initialize();
     CharacterProgressionSystem::GetInstance()->Initialize();
     QuestSystem::GetInstance()->Initialize();
+    SaveLoadSystem::GetInstance()->Initialize();
     
     LOG(Info, "All Linen RPG Systems initialized");
 }
@@ -39,14 +39,10 @@ void Linen::Deinitialize() {
     LOG(Info, "Linen::Deinitialize : ran");
     
     // Shutdown systems in reverse order
+    SaveLoadSystem::GetInstance()->Shutdown();
     QuestSystem::GetInstance()->Shutdown();
     CharacterProgressionSystem::GetInstance()->Shutdown();
     TestSystem::GetInstance()->Shutdown();
-    
-    // Then destroy instances
-    QuestSystem::Destroy();
-    CharacterProgressionSystem::Destroy();
-    TestSystem::Destroy();
 
     LOG(Info, "Linen Plugin Deinitialized.");
     GamePlugin::Deinitialize();
@@ -57,6 +53,7 @@ void Linen::Update(float deltaTime) {
     TestSystem::GetInstance()->Update(deltaTime);
     CharacterProgressionSystem::GetInstance()->Update(deltaTime);
     QuestSystem::GetInstance()->Update(deltaTime);
+    SaveLoadSystem::GetInstance()->Update(deltaTime);
     
     // Process events after all systems have updated
     m_eventSystem.ProcessEvents();

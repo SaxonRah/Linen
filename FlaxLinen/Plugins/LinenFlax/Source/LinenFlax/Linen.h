@@ -19,6 +19,7 @@ class RPGSystem;
 class TestSystem;
 class CharacterProgressionSystem;
 class QuestSystem;
+class SaveLoadSystem;
 class BinaryReader;
 class BinaryWriter;
 
@@ -42,6 +43,11 @@ public:
     
     void Shutdown() override {
         LOG(Info, "TestSystem Shutdown");
+    }
+
+    ~TestSystem() {
+        Destroy();
+        // Shutdown();
     }
 
     // Implement required abstract methods
@@ -160,6 +166,9 @@ T* Linen::GetSystem() {
     }
     else if constexpr (std::is_same<T, QuestSystem>::value) {
         return QuestSystem::GetInstance();
+    }
+    else if constexpr (std::is_same<T, SaveLoadSystem>::value) {
+        return SaveLoadSystem::GetInstance();
     }
     
     LOG(Warning, "Linen::GetSystem : No matching system found for type {0}", String(typeid(T).name()));

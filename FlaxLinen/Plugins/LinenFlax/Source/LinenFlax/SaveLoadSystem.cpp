@@ -5,6 +5,11 @@
 #include "Engine/Core/Log.h"
 #include <fstream>
 
+SaveLoadSystem::~SaveLoadSystem() {
+    Destroy();
+    // Shutdown();
+}
+
 void SaveLoadSystem::Initialize() {
     LOG(Info, "Save/Load System Initialized.");
 }

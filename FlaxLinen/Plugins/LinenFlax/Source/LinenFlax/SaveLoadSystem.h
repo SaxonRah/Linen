@@ -46,9 +46,7 @@ public:
         instance = nullptr;
     }
     
-    ~SaveLoadSystem() {
-        Shutdown();
-    }
+    ~SaveLoadSystem();
 
 private:
     SaveLoadSystem() {};

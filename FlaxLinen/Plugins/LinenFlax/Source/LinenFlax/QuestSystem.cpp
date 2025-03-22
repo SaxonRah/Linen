@@ -44,7 +44,8 @@ QuestSystem::QuestSystem() {
 }
 
 QuestSystem::~QuestSystem() {
-    Shutdown();
+    Destroy();
+    // Shutdown();
 }
 
 void QuestSystem::Initialize() {
@@ -114,14 +115,7 @@ QuestResult QuestSystem::ActivateQuest(const std::string& id) {
     event.questTitle = quest->GetTitle();
     event.oldState = oldState;
     event.newState = QuestState::Active;
-    
-    LOG(Info, "About to publish event...");
-    if (m_plugin) {
-        LOG(Info, "Plugin is not null");
-        m_plugin->GetEventSystem().Publish(event);
-    } else {
-        LOG(Warning, "Cannot publish event: plugin reference is null");
-    }
+    m_plugin->GetEventSystem().Publish(event);
     
     LOG(Info, "Activated quest: {0}", String(id.c_str()));
     return QuestResult::Success;
@@ -243,6 +237,16 @@ std::vector<Quest*> QuestSystem::GetCompletedQuests() const {
     std::vector<Quest*> result;
     for (const auto& pair : m_quests) {
         if (pair.second->GetState() == QuestState::Completed) {
+            result.push_back(pair.second.get());
+        }
+    }
+    return result;
+}
+
+std::vector<Quest*> QuestSystem::GetFailedQuests() const {
+    std::vector<Quest*> result;
+    for (const auto& pair : m_quests) {
+        if (pair.second->GetState() == QuestState::Failed) {
             result.push_back(pair.second.get());
         }
     }

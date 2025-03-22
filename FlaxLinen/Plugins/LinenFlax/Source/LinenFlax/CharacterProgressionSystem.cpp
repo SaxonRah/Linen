@@ -19,8 +19,8 @@ CharacterProgressionSystem::CharacterProgressionSystem() {
 }
 
 CharacterProgressionSystem::~CharacterProgressionSystem() {
-    // Cleanup code if needed
-    Shutdown();
+    Destroy();
+    // Shutdown();
 }
 
 void CharacterProgressionSystem::Initialize() {
