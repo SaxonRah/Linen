@@ -1,0 +1,2611 @@
+// v CharacterProgressionSystem.cpp
+#include "CharacterProgressionSystem.h"
+#include "QuestEvents.h"
+#include "LinenFlax.h"
+#include "Engine/Core/Log.h"
+
+Skill::Skill(const std::string& id, const std::string& name, const std::string& description)
+    : m_id(id)
+    , m_name(name)
+    , m_description(description)
+    , m_level(0)
+{
+}
+// Skill binary serialization
+void Skill::Serialize(BinaryWriter& writer) const {
+    writer.Write(m_id);
+    writer.Write(m_name);
+    writer.Write(m_description);
+    writer.Write(m_level);
+}
+
+// Skill binary deserialization
+void Skill::Deserialize(BinaryReader& reader) {
+    reader.Read(m_id);
+    reader.Read(m_name);
+    reader.Read(m_description);
+    reader.Read(m_level);
+}
+
+// Skill text serialization
+void Skill::SerializeToText(TextWriter& writer) const {
+    writer.Write("skillId", m_id);
+    writer.Write("skillName", m_name);
+    writer.Write("skillDescription", m_description);
+    writer.Write("skillLevel", m_level);
+}
+
+// Skill text deserialization
+void Skill::DeserializeFromText(TextReader& reader) {
+    reader.Read("skillId", m_id);
+    reader.Read("skillName", m_name);
+    reader.Read("skillDescription", m_description);
+    reader.Read("skillLevel", m_level);
+}
+
+CharacterProgressionSystem::CharacterProgressionSystem() {
+    // Initialize member variables if needed
+    m_experience = 0;
+    m_level = 1;
+}
+
+CharacterProgressionSystem::~CharacterProgressionSystem() {
+    Destroy();
+    // Shutdown();
+}
+
+void CharacterProgressionSystem::Initialize() {
+    // Subscribe to quest completed events
+    m_plugin->GetEventSystem().Subscribe<QuestCompletedEvent>(
+        [this](const QuestCompletedEvent& event) {
+            this->HandleQuestCompleted(event);
+        });
+    
+    LOG(Info, "Character Progression System Initialized.");
+}
+
+void CharacterProgressionSystem::Shutdown() {
+    m_skills.clear();
+    m_skillLevels.clear();
+    LOG(Info, "Character Progression System Shutdown.");
+}
+
+void CharacterProgressionSystem::Update(float deltaTime) {
+    // Nothing to update regularly
+}
+
+bool CharacterProgressionSystem::AddSkill(const std::string& id, const std::string& name, const std::string& description) {    
+    if (m_skills.find(id) != m_skills.end()) {
+        LOG(Warning, "Skill already exists: {0}", String(id.c_str()));
+        return false;
+    }
+    
+    auto skill = std::make_unique<Skill>(id, name, description);
+    m_skills[id] = std::move(skill);
+    m_skillLevels[id] = 0;
+    
+    LOG(Info, "Added skill: {0}", String(name.c_str()));
+    return true;
+}
+
+bool CharacterProgressionSystem::IncreaseSkill(const std::string& id, int amount) {    
+    auto it = m_skills.find(id);
+    if (it == m_skills.end()) {
+        LOG(Warning, "Skill not found: {0}", String(id.c_str()));
+        return false;
+    }
+    
+    it->second->IncreaseLevel(amount);
+    m_skillLevels[id] = it->second->GetLevel();
+    
+    LOG(Info, "Increased skill {0} by {1} to level {2}", 
+        String(id.c_str()), amount, it->second->GetLevel());
+    return true;
+}
+
+int CharacterProgressionSystem::GetSkillLevel(const std::string& id) const {    
+    auto it = m_skills.find(id);
+    if (it == m_skills.end()) {
+        return 0;
+    }    
+    return it->second->GetLevel();
+}
+
+void CharacterProgressionSystem::GainExperience(int amount) {
+    int oldLevel = m_level;
+    m_experience += amount;
+    
+    // Simple level up formula: level = sqrt(experience / 100)
+    m_level = 1 + static_cast<int>(sqrt(m_experience / 100.0));
+    
+    LOG(Info, "Gained {0} XP. Total XP: {1}", amount, m_experience);
+    
+    if (m_level > oldLevel) {
+        LOG(Info, "Level up! New level: {0}", m_level);
+    }
+}
+
+int CharacterProgressionSystem::GetExperience() const {
+    return m_experience;
+}
+
+int CharacterProgressionSystem::GetLevel() const {
+    return m_level;
+}
+
+const std::unordered_map<std::string, int>& CharacterProgressionSystem::GetSkills() const {
+    return m_skillLevels;
+}
+
+void CharacterProgressionSystem::HandleQuestCompleted(const QuestCompletedEvent& event) {
+    if (event.experienceGained > 0) {
+        GainExperience(event.experienceGained);
+        LOG(Info, "Gained {0} XP from completed quest: {1}", 
+            event.experienceGained, String(event.questTitle.c_str()));
+    }
+}
+
+void CharacterProgressionSystem::Serialize(BinaryWriter& writer) const {
+    // Write basic character data
+    writer.Write(m_experience);
+    writer.Write(m_level);
+    
+    // Write skills
+    writer.Write(static_cast<uint32_t>(m_skills.size()));
+    for (const auto& pair : m_skills) {
+        writer.Write(pair.first);  // Skill ID
+        writer.Write(pair.second->GetId());
+        writer.Write(pair.second->GetName());
+        writer.Write(pair.second->GetDescription());
+        writer.Write(pair.second->GetLevel());
+    }
+    
+    // Write skill levels cache
+    writer.Write(static_cast<uint32_t>(m_skillLevels.size()));
+    for (const auto& pair : m_skillLevels) {
+        writer.Write(pair.first);  // Skill ID
+        writer.Write(pair.second); // Skill level
+    }
+    
+    LOG(Info, "CharacterProgressionSystem serialized");
+}
+
+// CharacterProgressionSystem binary deserialization
+void CharacterProgressionSystem::Deserialize(BinaryReader& reader) {
+    // Clear existing data
+    m_skills.clear();
+    m_skillLevels.clear();
+    
+    // Read basic character data
+    reader.Read(m_experience);
+    reader.Read(m_level);
+    
+    // Read skills
+    uint32_t skillCount = 0;
+    reader.Read(skillCount);
+    
+    for (uint32_t i = 0; i < skillCount; ++i) {
+        std::string skillId;
+        reader.Read(skillId);
+        
+        std::string id, name, description;
+        int level;
+        reader.Read(id);
+        reader.Read(name);
+        reader.Read(description);
+        reader.Read(level);
+        
+        auto skill = std::make_unique<Skill>(id, name, description);
+        skill->SetLevel(level);
+        
+        m_skills[skillId] = std::move(skill);
+    }
+    
+    // Read skill levels cache
+    uint32_t levelCount = 0;
+    reader.Read(levelCount);
+    
+    for (uint32_t i = 0; i < levelCount; ++i) {
+        std::string skillId;
+        int level = 0;
+        reader.Read(skillId);
+        reader.Read(level);
+        m_skillLevels[skillId] = level;
+    }
+    
+    LOG(Info, "CharacterProgressionSystem deserialized");
+}
+
+// CharacterProgressionSystem text serialization
+void CharacterProgressionSystem::SerializeToText(TextWriter& writer) const {
+    // Write basic character data
+    writer.Write("characterExperience", m_experience);
+    writer.Write("characterLevel", m_level);
+    
+    // Write skill count
+    writer.Write("skillCount", static_cast<int>(m_skills.size()));
+    
+    // Write each skill
+    int index = 0;
+    for (const auto& pair : m_skills) {
+        std::string prefix = "skill" + std::to_string(index) + "_";
+        writer.Write(prefix + "id", pair.first);
+        writer.Write(prefix + "name", pair.second->GetName());
+        writer.Write(prefix + "description", pair.second->GetDescription());
+        writer.Write(prefix + "level", pair.second->GetLevel());
+        index++;
+    }
+    
+    // Write skill levels count
+    writer.Write("skillLevelsCount", static_cast<int>(m_skillLevels.size()));
+    
+    // Write skill levels
+    index = 0;
+    for (const auto& pair : m_skillLevels) {
+        std::string prefix = "skillLevel" + std::to_string(index) + "_";
+        writer.Write(prefix + "id", pair.first);
+        writer.Write(prefix + "level", pair.second);
+        index++;
+    }
+    
+    LOG(Info, "CharacterProgressionSystem serialized to text");
+}
+
+void CharacterProgressionSystem::DeserializeFromText(TextReader& reader) {
+    // Clear existing data
+    m_skills.clear();
+    m_skillLevels.clear();
+    
+    // Read basic character data
+    reader.Read("characterExperience", m_experience);
+    reader.Read("characterLevel", m_level);
+    
+    // Read skill count
+    int skillCount = 0;
+    reader.Read("skillCount", skillCount);
+    
+    // Read each skill
+    for (int i = 0; i < skillCount; i++) {
+        std::string prefix = "skill" + std::to_string(i) + "_";
+        
+        std::string id, name, description;
+        int level = 0;
+        
+        reader.Read(prefix + "id", id);
+        reader.Read(prefix + "name", name);
+        reader.Read(prefix + "description", description);
+        reader.Read(prefix + "level", level);
+        
+        auto skill = std::make_unique<Skill>(id, name, description);
+        skill->SetLevel(level);
+        
+        m_skills[id] = std::move(skill);
+    }
+    
+    // Read skill levels count
+    int skillLevelsCount = 0;
+    reader.Read("skillLevelsCount", skillLevelsCount);
+    
+    // Read skill levels
+    for (int i = 0; i < skillLevelsCount; i++) {
+        std::string prefix = "skillLevel" + std::to_string(i) + "_";
+        
+        std::string id;
+        int level = 0;
+        
+        reader.Read(prefix + "id", id);
+        reader.Read(prefix + "level", level);
+        
+        m_skillLevels[id] = level;
+    }
+    
+    LOG(Info, "CharacterProgressionSystem deserialized from text");
+}
+// ^ CharacterProgressionSystem.cpp
+// v CharacterProgressionSystem.h
+#pragma once
+
+#include "RPGSystem.h"
+#include "QuestEvents.h"
+#include "Serialization.h"
+
+#include <unordered_map>
+#include <string>
+#include <vector>
+#include <memory>
+
+class Skill {
+public:
+    Skill(const std::string& id, const std::string& name, const std::string& description);
+    
+    std::string GetId() const { return m_id; }
+    std::string GetName() const { return m_name; }
+    std::string GetDescription() const { return m_description; }
+    int GetLevel() const { return m_level; }
+    
+    void SetLevel(int level) { m_level = level; }
+    void IncreaseLevel(int amount = 1) { m_level += amount; }
+    
+    void Serialize(BinaryWriter& writer) const;
+    void Deserialize(BinaryReader& reader);
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
+
+private:
+    std::string m_id;
+    std::string m_name;
+    std::string m_description;
+    int m_level = 0;
+};
+
+class CharacterProgressionSystem : public RPGSystem {
+public:
+    // Delete copy constructor and assignment operator
+    CharacterProgressionSystem(const CharacterProgressionSystem&) = delete;
+    CharacterProgressionSystem& operator=(const CharacterProgressionSystem&) = delete;
+    
+    // Meyer's Singleton - thread-safe in C++11 and beyond
+    static CharacterProgressionSystem* GetInstance() {
+        // Thread-safe in C++11 and beyond
+        static CharacterProgressionSystem* instance = new CharacterProgressionSystem();
+        return instance;
+    }
+
+    // RPGSystem interface
+    void Initialize() override;
+    void Shutdown() override;
+    void Update(float deltaTime) override;
+    
+    // Implement GetName from LinenSystem
+    std::string GetName() const override { return "CharacterProgressionSystem"; }
+
+    // Skill management
+    bool AddSkill(const std::string& id, const std::string& name, const std::string& description);
+    bool IncreaseSkill(const std::string& id, int amount = 1);
+    int GetSkillLevel(const std::string& id) const;
+    
+    // Requirements checking
+    const std::unordered_map<std::string, int>& GetSkills() const;
+
+    // Experience management
+    void GainExperience(int amount);
+    int GetExperience() const;
+    int GetLevel() const;
+    
+    // Serialization override
+    void Serialize(BinaryWriter& writer) const override;
+    void Deserialize(BinaryReader& reader) override;
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
+    
+    // Cleanup method
+    static void Destroy() {
+        static CharacterProgressionSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
+    }
+    
+    ~CharacterProgressionSystem();
+
+private:
+    // Private constructor
+    CharacterProgressionSystem();
+
+    // Event handlers
+    void HandleQuestCompleted(const QuestCompletedEvent& event);
+
+    // Character data
+    int m_experience = 0;
+    int m_level = 1;
+    std::unordered_map<std::string, std::unique_ptr<Skill>> m_skills;
+    std::unordered_map<std::string, int> m_skillLevels; // Cache for requirements checking
+};
+// ^ CharacterProgressionSystem.h
+// v EventSystem.h
+#pragma once
+
+#include <string>
+#include <functional>
+#include <unordered_map>
+#include <vector>
+#include <typeindex>
+#include <memory>
+#include <queue>
+
+// Event Priority enum class
+enum class EventPriority {
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3
+};
+
+// Base event class
+class Event {
+public:
+    virtual ~Event() = default;
+    virtual std::type_index GetType() const = 0;
+
+    // Priority management
+    EventPriority GetPriority() const { return m_priority; }
+    void SetPriority(EventPriority priority) { m_priority = priority; }
+
+protected:
+    EventPriority m_priority = EventPriority::Normal;
+};
+
+// Template derived event
+template <typename T>
+class EventType : public Event {
+public:
+    std::type_index GetType() const override { return std::type_index(typeid(T)); }
+};
+
+// Event handler wrapper
+class EventHandlerBase {
+public:
+    virtual ~EventHandlerBase() = default;
+    virtual void Handle(const Event* event) const = 0;
+};
+
+template <typename T>
+class EventHandler : public EventHandlerBase {
+public:
+    using HandlerFunc = std::function<void(const T&)>;
+
+    EventHandler(HandlerFunc handler) : m_handler(handler) {}
+
+    void Handle(const Event* event) const override {
+        m_handler(*static_cast<const T*>(event));
+    }
+
+private:
+    HandlerFunc m_handler;
+};
+
+// Optimized event system with filtering capabilities and priority support
+class EventSystem {
+public:
+    template <typename T>
+    void Subscribe(std::function<void(const T&)> handler, const std::string& filter = "") {
+        static_assert(std::is_base_of<EventType<T>, T>::value, "T must derive from EventType<T>");
+
+        std::type_index type = std::type_index(typeid(T));
+        auto handlerPtr = std::make_shared<EventHandler<T>>(handler);
+
+        if (filter.empty()) {
+            m_handlers[type].push_back(handlerPtr);
+        }
+        else {
+            m_filteredHandlers[type][filter].push_back(handlerPtr);
+        }
+    }
+
+    template <typename T>
+    void Publish(const T& event, const std::string& filter = "", EventPriority priority = EventPriority::Normal) {
+        static_assert(std::is_base_of<EventType<T>, T>::value, "T must derive from EventType<T>");
+
+        // Create a shared copy of the event
+        auto eventPtr = std::make_shared<T>(event);
+
+        // Set the priority
+        eventPtr->SetPriority(priority);
+
+        // Queue the event
+        std::type_index type = std::type_index(typeid(T));
+        m_eventQueue.push(QueuedEvent(eventPtr, type, filter));
+    }
+
+    template <typename T>
+    void PublishImmediate(const T& event, const std::string& filter = "") {
+        static_assert(std::is_base_of<EventType<T>, T>::value, "T must derive from EventType<T>");
+
+        // Create a shared copy of the event
+        auto eventPtr = std::make_shared<T>(event);
+        std::type_index type = std::type_index(typeid(T));
+
+        // Process global handlers
+        if (m_handlers.find(type) != m_handlers.end()) {
+            for (const auto& handler : m_handlers[type]) {
+                handler->Handle(eventPtr.get());
+            }
+        }
+
+        // Process filtered handlers
+        if (!filter.empty() && m_filteredHandlers.find(type) != m_filteredHandlers.end() &&
+            m_filteredHandlers[type].find(filter) != m_filteredHandlers[type].end()) {
+            for (const auto& handler : m_filteredHandlers[type][filter]) {
+                handler->Handle(eventPtr.get());
+            }
+        }
+    }
+
+    void ProcessEvents() {
+        std::vector<QueuedEvent> processingBatch;
+
+        // Move all events from the priority queue to our processing batch
+        while (!m_eventQueue.empty()) {
+            processingBatch.push_back(m_eventQueue.top());
+            m_eventQueue.pop();
+        }
+
+        // Process events in priority order (highest priority first)
+        for (const auto& queuedEvent : processingBatch) {
+            const auto& eventPtr = queuedEvent.event;
+            const auto& type = queuedEvent.type;
+            const auto& filter = queuedEvent.filter;
+
+            // Process global handlers
+            if (m_handlers.find(type) != m_handlers.end()) {
+                for (const auto& handler : m_handlers[type]) {
+                    handler->Handle(eventPtr.get());
+                }
+            }
+
+            // Process filtered handlers
+            if (!filter.empty() && m_filteredHandlers.find(type) != m_filteredHandlers.end() &&
+                m_filteredHandlers[type].find(filter) != m_filteredHandlers[type].end()) {
+                for (const auto& handler : m_filteredHandlers[type][filter]) {
+                    handler->Handle(eventPtr.get());
+                }
+            }
+        }
+    }
+
+private:
+    struct QueuedEvent {
+        std::shared_ptr<Event> event;
+        std::type_index type;
+        std::string filter;
+
+        // Constructor to capture priority from the event
+        QueuedEvent(std::shared_ptr<Event> e, std::type_index t, const std::string& f)
+            : event(e), type(t), filter(f) {
+        }
+
+        // Comparison operator for priority queue
+        bool operator<(const QueuedEvent& other) const {
+            // Higher priority value means higher actual priority in std::priority_queue
+            return event->GetPriority() < other.event->GetPriority();
+        }
+    };
+
+    std::unordered_map<std::type_index, std::vector<std::shared_ptr<EventHandlerBase>>> m_handlers;
+    std::unordered_map<std::type_index, std::unordered_map<std::string,
+        std::vector<std::shared_ptr<EventHandlerBase>>>> m_filteredHandlers;
+
+    // Priority queue for event processing
+    std::priority_queue<QueuedEvent> m_eventQueue;
+};
+
+/*
+How to use the prioritized event system:
+
+For a critical event that needs immediate attention:
+    QuestFailedEvent event;
+    event.questId = "main_quest";
+    event.reason = "Time limit exceeded";
+    m_plugin->GetEventSystem().Publish(event, "", EventPriority::Critical);
+
+For a low-priority notification:
+    PlayerLevelUpEvent event;
+    event.newLevel = 5;
+    m_plugin->GetEventSystem().Publish(event, "", EventPriority::Low);
+*/
+// ^ EventSystem.h
+// v LinenFlax.Build.cs
+using Flax.Build;
+using Flax.Build.NativeCpp;
+
+public class LinenFlax : GameModule
+{
+    /// <inheritdoc />
+    public override void Setup(BuildOptions options)
+    {
+        base.Setup(options);
+        BuildNativeCode = true;
+        options.PublicDefinitions.Add("COMPILE_WITH_FLAX");
+        options.CompileEnv.CppVersion = CppVersion.Cpp17;
+        options.PublicDependencies.Add("Core");
+        options.PublicDependencies.Add("Engine");
+    }
+}
+// ^ LinenFlax.Build.cs
+// v LinenFlax.cpp
+#include "LinenFlax.h"
+#include "LinenSystemIncludes.h" // Include all systems
+#include "Engine/Core/Log.h"
+
+LinenFlax::LinenFlax(const SpawnParams& params) : GamePlugin(params)
+{
+    _description.Name = TEXT("LinenFlax");
+#if USE_EDITOR
+    _description.Category = TEXT("Gameplay");
+    _description.Description = TEXT("LinenFlax plugin");
+    _description.Author = TEXT("ParabolicLabs");
+    _description.RepositoryUrl = TEXT("");
+#endif
+    _description.Version = Version(1, 0, 0);
+}
+
+void LinenFlax::Initialize() {
+    GamePlugin::Initialize();
+    
+    LOG(Info, "LinenFlax::Initialize : ran");
+
+    // Set plugin references first
+    TestSystem::GetInstance()->SetPlugin(this);
+    CharacterProgressionSystem::GetInstance()->SetPlugin(this);
+    QuestSystem::GetInstance()->SetPlugin(this);
+    SaveLoadSystem::GetInstance()->SetPlugin(this);
+    
+    // Then initialize systems in dependency order
+    TestSystem::GetInstance()->Initialize();
+    CharacterProgressionSystem::GetInstance()->Initialize();
+    QuestSystem::GetInstance()->Initialize();
+    SaveLoadSystem::GetInstance()->Initialize();
+    
+    LOG(Info, "All LinenFlax RPG Systems initialized");
+}
+
+void LinenFlax::Deinitialize() {
+    LOG(Info, "LinenFlax::Deinitialize : ran");
+    
+    // Shutdown systems in reverse order
+    SaveLoadSystem::GetInstance()->Shutdown();
+    QuestSystem::GetInstance()->Shutdown();
+    CharacterProgressionSystem::GetInstance()->Shutdown();
+    TestSystem::GetInstance()->Shutdown();
+
+    LOG(Info, "LinenFlax Plugin Deinitialized.");
+    GamePlugin::Deinitialize();
+}
+
+void LinenFlax::Update(float deltaTime) {
+    // Update all singleton systems
+    TestSystem::GetInstance()->Update(deltaTime);
+    CharacterProgressionSystem::GetInstance()->Update(deltaTime);
+    QuestSystem::GetInstance()->Update(deltaTime);
+    SaveLoadSystem::GetInstance()->Update(deltaTime);
+    
+    // Process events after all systems have updated
+    m_eventSystem.ProcessEvents();
+}
+
+bool LinenFlax::DetectCycle(const std::string& systemName, 
+    std::unordered_set<std::string>& visited, 
+    std::unordered_set<std::string>& recursionStack) {
+    if (recursionStack.count(systemName)) return true;  // Cycle detected
+    if (visited.count(systemName)) return false;
+
+    visited.insert(systemName);
+    recursionStack.insert(systemName);
+
+    for (const auto& dependency : m_registeredSystems[systemName]->GetDependencies()) {
+    if (DetectCycle(dependency, visited, recursionStack)) return true;
+    }
+
+    recursionStack.erase(systemName);
+    return false;
+}
+
+void LinenFlax::CalculateInitializationOrder() {
+    m_initializationOrder.clear();
+    
+    // Topological sort of systems based on dependencies
+    std::unordered_set<std::string> visited;
+    std::unordered_set<std::string> inProgress;
+    std::unordered_set<std::string> recursionStack;
+
+    for (const auto& pair : m_registeredSystems) {
+        if (DetectCycle(pair.first, visited, recursionStack)) {
+            LOG(Error, "Cyclic dependency detected in system: {0}", String(pair.first.c_str()));
+            return;
+        }
+    }
+
+    // Reset visited set for the actual traversal
+    visited.clear();
+    
+    // Visit all registered systems
+    for (const auto& pair : m_registeredSystems) {
+        if (visited.find(pair.first) == visited.end()) {
+            VisitSystem(pair.first, visited, inProgress);
+        }
+    }
+}
+
+// Implement the member function
+void LinenFlax::VisitSystem(const std::string& systemName,
+                      std::unordered_set<std::string>& visited,
+                      std::unordered_set<std::string>& inProgress) {
+    if (inProgress.find(systemName) != inProgress.end()) {
+        LOG(Error, "Circular dependency detected for system: {0}", String(systemName.c_str()));
+        return;
+    }
+    
+    if (visited.find(systemName) != visited.end()) {
+        return;
+    }
+    
+    inProgress.insert(systemName);
+    
+    auto it = m_registeredSystems.find(systemName);
+    if (it != m_registeredSystems.end()) {
+        for (const auto& dep : it->second->GetDependencies()) {
+            VisitSystem(dep, visited, inProgress);
+        }
+    }
+    
+    inProgress.erase(systemName);
+    visited.insert(systemName);
+    m_initializationOrder.push_back(systemName);
+}
+// ^ LinenFlax.cpp
+// v LinenFlax.h
+#pragma once
+
+#include "Engine/Scripting/Plugins/GamePlugin.h"
+#include "Engine/Core/Log.h"
+#include "EventSystem.h"
+#include "RPGSystem.h"
+
+#include <string>
+#include <unordered_set> 
+#include <unordered_map>
+#include <memory>
+#include <vector>
+#include <typeindex>
+#include <functional>
+
+// Forward declarations
+class RPGSystem;
+class TestSystem;
+class CharacterProgressionSystem;
+class QuestSystem;
+class SaveLoadSystem;
+
+class BinaryReader;
+class BinaryWriter;
+class TextWriter;
+class TextReader;
+
+// Example test system
+class TestSystem : public RPGSystem {
+private:
+    int _testValue;
+
+    // Private constructor to prevent direct instantiation
+    TestSystem() : _testValue(0) {}
+
+public:
+    // Delete copy constructor and assignment operator
+    TestSystem(const TestSystem&) = delete;
+    TestSystem& operator=(const TestSystem&) = delete;
+
+    void Initialize() override {
+        LOG(Info, "TestSystem Initialized");
+        _testValue = 0;
+    }
+    
+    void Shutdown() override {
+        LOG(Info, "TestSystem Shutdown");
+    }
+
+    ~TestSystem() {
+        Destroy();
+        // Shutdown();
+    }
+
+    // Implement required abstract methods
+    std::string GetName() const override { return "TestSystem"; }
+    
+    void Serialize(BinaryWriter& writer) const override {
+        writer.Write(_testValue);
+        LOG(Info, "TestSystem serialized with value: {0}", _testValue);
+    }
+    
+    void Deserialize(BinaryReader& reader) override {
+        reader.Read(_testValue);
+        LOG(Info, "TestSystem deserialized with value: {0}", _testValue);
+    }
+    
+    void SerializeToText(TextWriter& writer) const {
+        writer.Write("testValue", _testValue);
+        LOG(Info, "TestSystem serialized to text with value: {0}", _testValue);
+    }
+    
+    void DeserializeFromText(TextReader& reader) {
+        reader.Read("testValue", _testValue);
+        LOG(Info, "TestSystem deserialized from text with value: {0}", _testValue);
+    }
+    
+    // GetInstance method
+    static TestSystem* GetInstance() {
+        // Thread-safe in C++11 and beyond
+        static TestSystem* instance = new TestSystem();
+        return instance;
+    }
+
+    // Cleanup method (important!)
+    static void Destroy() {
+        static TestSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
+    }
+    
+    void Update(float deltaTime) override {}
+
+    bool AddValue(int value) {
+        LOG(Info, "TestSystem::AddValue : starting with value: {0}", value);
+        _testValue = value;
+        LOG(Info, "TestSystem::AddValue : set value to: {0}", _testValue);
+        return true;
+    }
+    
+    int GetValue() const {
+        LOG(Info, "TestSystem::GetValue : returning: {0}", _testValue);
+        return _testValue;
+    }
+};
+
+API_CLASS(Namespace="ParabolicLabs") class LINENFLAX_API LinenFlax : public GamePlugin
+{
+    
+DECLARE_SCRIPTING_TYPE(LinenFlax);
+
+public:
+        
+    // Delete copy operations
+    LinenFlax(const LinenFlax&) = delete;
+    LinenFlax& operator=(const LinenFlax&) = delete;
+
+    // Core plugin lifecycle
+    void Initialize() override;
+    void Deinitialize() override;
+
+    /// <summary>
+    /// Updates all systems and processes events
+    /// </summary>
+    void Update(float deltaTime);
+
+    // System management
+    template <typename T>
+    bool RegisterSystem();
+    
+    template <typename T>
+    bool LoadSystem();
+    
+    template <typename T>
+    bool UnloadSystem();
+    
+    // Thread-safe event system access
+    EventSystem& GetEventSystem() { return m_eventSystem; }
+
+    /// <summary>
+    /// Gets a specific RPG system by type
+    /// </summary>
+    template <typename T>
+    T* GetSystem();
+    
+private:
+    // Determines correct initialization order based on dependencies
+
+    void VisitSystem(const std::string& systemName, 
+        std::unordered_set<std::string>& visited,
+        std::unordered_set<std::string>& inProgress);
+    bool DetectCycle(const std::string& systemName, 
+        std::unordered_set<std::string>& visited, 
+        std::unordered_set<std::string>& recursionStack);
+    void CalculateInitializationOrder();
+
+    // Organizes systems by dependencies
+    std::vector<std::string> m_initializationOrder;
+
+    // Maps for system management
+    std::unordered_map<std::string, std::unique_ptr<RPGSystem>> m_registeredSystems;
+    std::unordered_map<std::string, RPGSystem*> m_activeSystems;
+    std::unordered_map<std::type_index, std::string> m_typeToName;
+
+    // Centralized event system
+    EventSystem m_eventSystem;
+};
+
+// Template implementations
+template <typename T>
+T* LinenFlax::GetSystem() {
+    // C++17 compatible implementation
+    if constexpr (std::is_same<T, TestSystem>::value) {
+        return TestSystem::GetInstance();
+    }
+    else if constexpr (std::is_same<T, CharacterProgressionSystem>::value) {
+        return CharacterProgressionSystem::GetInstance();
+    }
+    else if constexpr (std::is_same<T, QuestSystem>::value) {
+        return QuestSystem::GetInstance();
+    }
+    else if constexpr (std::is_same<T, SaveLoadSystem>::value) {
+        return SaveLoadSystem::GetInstance();
+    }
+    
+    LOG(Warning, "LinenFlax::GetSystem : No matching system found for type {0}", String(typeid(T).name()));
+    return nullptr;
+}
+
+template <typename T>
+bool LinenFlax::RegisterSystem() {
+    static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
+    
+    auto system = std::make_unique<T>();
+    std::string systemName = system->GetName();
+    
+    if (m_registeredSystems.find(systemName) != m_registeredSystems.end()) {
+        LOG(Warning, "System already registered: {0}", String(systemName.c_str()));
+        return false;
+    }
+    
+    // Store type information for safer access
+    m_typeToName[std::type_index(typeid(T))] = systemName;
+    
+    // Set plugin reference and store system
+    system->SetPlugin(this);
+    m_registeredSystems[systemName] = std::move(system);
+    
+    // Recalculate initialization order
+    CalculateInitializationOrder();
+    
+    LOG(Info, "Registered system: {0}", String(systemName.c_str()));
+    return true;
+}
+
+template <typename T>
+bool LinenFlax::LoadSystem() {
+    static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
+   
+    auto typeIndex = std::type_index(typeid(T));
+    
+    // Check if we know about this type
+    if (m_typeToName.find(typeIndex) == m_typeToName.end()) {
+        LOG(Warning, "System not registered: {0}", String(typeid(T).name()));
+        return false;
+    }
+    
+    std::string systemName = m_typeToName[typeIndex];
+    
+    // Check if already loaded
+    if (m_activeSystems.find(systemName) != m_activeSystems.end()) {
+        LOG(Info, "System already loaded: {0}", String(systemName.c_str()));
+        return true;
+    }
+    
+    // Check if system is registered
+    if (m_registeredSystems.find(systemName) == m_registeredSystems.end()) {
+        LOG(Warning, "System not registered: {0}", String(systemName.c_str()));
+        return false;
+    }
+    
+    // First load dependencies
+    auto& system = m_registeredSystems[systemName];
+    for (const auto& dependency : system->GetDependencies()) {
+        if (m_activeSystems.find(dependency) == m_activeSystems.end()) {
+            LOG(Info, "Loading dependency: {0} for {1}", 
+                String(dependency.c_str()), String(systemName.c_str()));
+            
+            // Find and load the dependency
+            if (m_registeredSystems.find(dependency) != m_registeredSystems.end()) {
+                m_registeredSystems[dependency]->Initialize();
+                m_activeSystems[dependency] = m_registeredSystems[dependency].get();
+            } else {
+                LOG(Warning, "Missing dependency: {0}", String(dependency.c_str()));
+                return false;
+            }
+        }
+    }
+    
+    // Initialize the system
+    system->Initialize();
+    m_activeSystems[systemName] = system.get();
+    
+    LOG(Info, "Loaded system: {0}", String(systemName.c_str()));
+    return true;
+}
+
+template <typename T>
+bool LinenFlax::UnloadSystem() {
+    static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
+    
+    auto typeIndex = std::type_index(typeid(T));
+    if (m_typeToName.find(typeIndex) == m_typeToName.end()) {
+        LOG(Warning, "System not registered: {0}", String(typeid(T).name()));
+        return false;
+    }
+    
+    std::string systemName = m_typeToName[typeIndex];
+    
+    // Check if system is active
+    auto it = m_activeSystems.find(systemName);
+    if (it == m_activeSystems.end()) {
+        LOG(Info, "System not active: {0}", String(systemName.c_str()));
+        return true;
+    }
+    
+    // Check for dependent systems
+    for (const auto& pair : m_activeSystems) {
+        auto& activeSystem = m_registeredSystems[pair.first];
+        if (activeSystem->GetDependencies().find(systemName) != activeSystem->GetDependencies().end()) {
+            LOG(Warning, "Cannot unload {0}, it is a dependency of {1}",
+                String(systemName.c_str()), String(pair.first.c_str()));
+            return false;
+        }
+    }
+    
+    // Shutdown the system
+    m_registeredSystems[systemName]->Shutdown();
+    m_activeSystems.erase(it);
+    
+    LOG(Info, "Unloaded system: {0}", String(systemName.c_str()));
+    return true;
+}
+// ^ LinenFlax.h
+// v LinenSystem.h
+#pragma once
+#include <string>
+#include "Serialization.h"
+
+// Simple base system class
+class LinenSystem {
+public:
+    virtual ~LinenSystem() = default;
+    virtual void Initialize() = 0;
+    virtual void Shutdown() = 0;
+    virtual void Update(float deltaTime) {}
+    virtual std::string GetName() const = 0;
+    
+    // Serialization methods
+    virtual void Serialize(BinaryWriter& writer) const { /* Default empty implementation */ }
+    virtual void Deserialize(BinaryReader& reader) { /* Default empty implementation */ }
+    virtual void SerializeToText(TextWriter& writer) const { /* Default empty implementation */ }
+    virtual void DeserializeFromText(TextReader& reader) { /* Default empty implementation */ }
+
+};
+// ^ LinenSystem.h
+#pragma once
+
+// This file includes all system headers to avoid circular dependencies
+
+// Include all standard library headers first
+// #include <string>
+// #include <vector>
+// #include <unordered_map>
+// #include <unordered_set>
+// #include <memory>
+// #include <functional>
+
+// Then include all system header files in proper order
+#include "LinenSystem.h"
+#include "RPGSystem.h"
+#include "Serialization.h"
+#include "QuestTypes.h"
+#include "QuestEvents.h"
+#include "CharacterProgressionSystem.h"
+#include "QuestSystem.h"
+#include "SaveLoadSystem.h"
+// v LinenTest.cpp
+#include "LinenTest.h"
+#include "LinenFlax.h"
+#include "LinenSystemIncludes.h"
+#include "Engine/Core/Log.h"
+#include "Engine/Scripting/Plugins/PluginManager.h"
+
+LinenTest::LinenTest(const SpawnParams& params)
+    : Script(params)
+{
+    _tickUpdate = true;
+}
+
+void LinenTest::OnEnable()
+{   
+    try {
+        LOG(Info, "LinenTest::OnEnable : Starting LinenTest");
+
+        // Try to get the plugin from the PluginManager
+        auto* plugin = PluginManager::GetPlugin<LinenFlax>();
+        if (plugin && typeid(*plugin) == typeid(LinenFlax)) {
+
+            // Test CharacterProgressionSystem functionality
+            auto* characterProgressionSystem = plugin->GetSystem<CharacterProgressionSystem>();
+            if (characterProgressionSystem) {
+                LOG(Info, "Character Progression System loaded");
+
+                // Skills
+                characterProgressionSystem->AddSkill("strength", "Strength", "Physical power");
+                characterProgressionSystem->AddSkill("intelligence", "Intelligence", "Mental acuity");
+                characterProgressionSystem->IncreaseSkill("strength", 42);
+                characterProgressionSystem->IncreaseSkill("intelligence", 42);
+                int str_skill_level = characterProgressionSystem->GetSkillLevel("strength");
+                LOG(Info, "LinenTest::OnEnable : characterProgressionSystem Retrieved Skill Level: {0}", str_skill_level);
+                int int_skill_level = characterProgressionSystem->GetSkillLevel("intelligence");
+                LOG(Info, "LinenTest::OnEnable : characterProgressionSystem Retrieved Skill Level: {0}", int_skill_level);
+                
+                // Experience
+                int experience = characterProgressionSystem->GetExperience();
+                LOG(Info, "LinenTest::OnEnable : characterProgressionSystem Retrieved Experience: {0}", experience);
+                characterProgressionSystem->GainExperience(42);
+                experience = characterProgressionSystem->GetExperience();
+                LOG(Info, "LinenTest::OnEnable : characterProgressionSystem Retrieved Experience: {0}", experience);
+                int level = characterProgressionSystem->GetLevel();
+                LOG(Info, "LinenTest::OnEnable : characterProgressionSystem Retrieved Level: {0}", level);
+            } else {
+                LOG(Error, "Character Progression System not found!");
+            }
+
+            // Test QuestSystem functionality
+            auto* questSystem = plugin->GetSystem<QuestSystem>();
+            if (questSystem) {
+                LOG(Info, "Quest System loaded");
+
+                // Quest Management
+                questSystem->AddQuest("test_quest_completed", "Test Quest Complete", "A test quest complete.");
+                questSystem->AddQuest("test_quest_failed", "Test Quest Fail", "A test quest failing.");
+                questSystem->ActivateQuest("test_quest_completed");
+                questSystem->CompleteQuest("test_quest_completed");
+                questSystem->ActivateQuest("test_quest_failed");
+                questSystem->FailQuest("test_quest_failed");
+
+                // Quest queries
+                questSystem->AddQuest("test_quest_query", "Test Quest Query", "A test quest query.");
+                questSystem->AddQuest("test_quest_query_2", "Test Quest Query 2", "A test quest query 2.");
+                questSystem->ActivateQuest("test_quest_query");
+                Quest* quest = questSystem->GetQuest("test_quest_query");
+                
+                std::vector<Quest*> availableQuests = questSystem->GetAvailableQuests();
+                std::vector<Quest*> activeQuests = questSystem->GetActiveQuests();
+                std::vector<Quest*> completedQuests = questSystem->GetCompletedQuests();
+                std::vector<Quest*> failedQuests = questSystem->GetFailedQuests();
+
+                // Log just the sizes
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Available Quests: {0}", availableQuests.size());
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Active Quests: {0}", activeQuests.size());
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Completed Quests: {0}", completedQuests.size());
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Failed Quests: {0}", failedQuests.size());
+
+                // For available quests
+                String availableQuestIds;
+                for (size_t i = 0; i < availableQuests.size(); i++) {
+                    availableQuestIds += String(availableQuests[i]->GetId().c_str());
+                    if (i < availableQuests.size() - 1) availableQuestIds += TEXT(", ");
+                }
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Available Quests: {0} [{1}]", 
+                    availableQuests.size(), 
+                    availableQuestIds);
+
+                // For active quests
+                String activeQuestIds;
+                for (size_t i = 0; i < activeQuests.size(); i++) {
+                    activeQuestIds += String(activeQuests[i]->GetId().c_str());
+                    if (i < activeQuests.size() - 1) activeQuestIds += TEXT(", ");
+                }
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Active Quests: {0} [{1}]", 
+                    activeQuests.size(), 
+                    activeQuestIds);
+
+                // For completed quests
+                String completedQuestIds;
+                for (size_t i = 0; i < completedQuests.size(); i++) {
+                    completedQuestIds += String(completedQuests[i]->GetId().c_str());
+                    if (i < completedQuests.size() - 1) completedQuestIds += TEXT(", ");
+                }
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Completed Quests: {0} [{1}]", 
+                    completedQuests.size(), 
+                    completedQuestIds);
+                    
+                // For failed quests
+                String failedQuestIds;
+                for (size_t i = 0; i < failedQuests.size(); i++) {
+                    failedQuestIds += String(failedQuests[i]->GetId().c_str());
+                    if (i < failedQuests.size() - 1) failedQuestIds += TEXT(", ");
+                }
+                LOG(Info, "LinenTest::OnEnable : questSystem Retrieved Failed Quests: {0} [{1}]", 
+                    failedQuests.size(), 
+                    failedQuestIds);
+
+            } else {
+                LOG(Error, "Quest System not found!");
+            }
+
+            // Test the SaveLoadSystem
+            auto* saveLoadSystem = plugin->GetSystem<SaveLoadSystem>();
+            if (saveLoadSystem) {
+                LOG(Info, "LinenTest::OnEnable : Save Load System loaded");
+                
+                // Test binary serialization
+                saveLoadSystem->SaveGame("TestSave.bin", SerializationFormat::Binary);
+                saveLoadSystem->LoadGame("TestSave.bin", SerializationFormat::Binary);
+                
+                // Test text serialization
+                saveLoadSystem->SaveGame("TestSave.txt", SerializationFormat::Text);
+                saveLoadSystem->LoadGame("TestSave.txt", SerializationFormat::Text);
+            }
+            else {
+                LOG(Warning, "LinenTest::OnEnable : Save Load System not found");
+            }
+
+            // Test the TestSystem
+            auto* testSystem = plugin->GetSystem<TestSystem>();
+            if (testSystem) {
+                LOG(Info, "LinenTest::OnEnable : Test System loaded");
+                LOG(Info, "LinenTest::OnEnable : About to add value");
+                testSystem->AddValue(42);
+                
+                LOG(Info, "LinenTest::OnEnable : About to get value");
+                int value = testSystem->GetValue();
+                LOG(Info, "LinenTest::OnEnable : Retrieved value: {0}", value);
+            }
+            else {
+                LOG(Warning, "LinenTest::OnEnable : Test System not found");
+            }
+        } else {
+            LOG(Error, "LinenTest::OnEnable : Linen Plugin not found!");
+            
+            // Instead of creating a local instance, we should find out why the plugin isn't registered
+            LOG(Info, "LinenTest::OnEnable : TODO Checking for all available plugins");
+            // This would require additional code to list all plugins
+        }
+    }
+    catch (...) {
+        LOG(Error, "LinenTest::OnEnable : Exception during Linen testing");
+    }
+
+    LOG(Info, "LinenTest::OnEnable completed");
+}
+
+void LinenTest::OnDisable()
+{
+    // Minimal implementation
+    LOG(Info, "LinenTest::OnDisable : ran.");
+}
+
+void LinenTest::OnUpdate()
+{
+    // Minimal implementation
+    LOG(Info, "LinenTest::OnUpdate : ran.");
+}
+// ^ LinenTest.cpp
+// v LinenTest.h
+#pragma once
+#include "Engine/Scripting/Script.h"
+
+API_CLASS() class LINENFLAX_API LinenTest : public Script
+{
+API_AUTO_SERIALIZATION();
+DECLARE_SCRIPTING_TYPE(LinenTest);
+
+    void OnEnable() override;
+    void OnDisable() override;
+    void OnUpdate() override;
+};
+// ^ LinenTest.h
+// v QuestEvents.h
+#pragma once
+
+#include "EventSystem.h"
+#include "QuestTypes.h"
+#include <string>
+
+
+// Event fired when a quest is completed
+class QuestCompletedEvent : public EventType<QuestCompletedEvent> {
+public:
+    std::string questId;
+    std::string questTitle;
+    int experienceGained = 0;
+};
+
+// Event fired when a quest's state changes
+class QuestStateChangedEvent : public EventType<QuestStateChangedEvent> {
+public:
+    std::string questId;
+    std::string questTitle;
+    QuestState oldState;
+    QuestState newState;
+};
+
+// ^ QuestEvents.h
+// v QuestSystem.cpp
+#include "QuestSystem.h"
+#include "CharacterProgressionSystem.h"
+#include "LinenFlax.h"
+#include "Engine/Core/Log.h"
+
+// QuestSystem* QuestSystem::s_instance = nullptr;
+
+Quest::Quest(const std::string& id, const std::string& title, const std::string& description)
+    : m_id(id)
+    , m_title(title)
+    , m_description(description)
+    , m_state(QuestState::Available)
+    , m_experienceReward(0)
+{
+}
+
+
+void Quest::AddSkillRequirement(const std::string& skillName, int requiredLevel) {
+    m_skillRequirements[skillName] = requiredLevel;
+}
+
+bool Quest::CheckRequirements(const std::unordered_map<std::string, int>& playerSkills) const {
+    for (const auto& req : m_skillRequirements) {
+        auto it = playerSkills.find(req.first);
+        if (it == playerSkills.end() || it->second < req.second) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void Quest::Serialize(BinaryWriter& writer) const {
+    writer.Write(m_id);
+    writer.Write(m_title);
+    writer.Write(m_description);
+    writer.Write(static_cast<int32_t>(m_state));
+    writer.Write(m_experienceReward);
+    
+    // Write skill requirements
+    writer.Write(static_cast<uint32_t>(m_skillRequirements.size()));
+    for (const auto& pair : m_skillRequirements) {
+        writer.Write(pair.first);  // Skill name
+        writer.Write(pair.second); // Required level
+    }
+}
+
+void Quest::Deserialize(BinaryReader& reader) {
+    reader.Read(m_id);
+    reader.Read(m_title);
+    reader.Read(m_description);
+    
+    int32_t stateValue = 0;
+    reader.Read(stateValue);
+    m_state = static_cast<QuestState>(stateValue);
+    
+    reader.Read(m_experienceReward);
+    
+    // Read skill requirements
+    uint32_t requirementCount = 0;
+    reader.Read(requirementCount);
+    
+    m_skillRequirements.clear();
+    for (uint32_t i = 0; i < requirementCount; ++i) {
+        std::string skillName;
+        int requiredLevel = 0;
+        reader.Read(skillName);
+        reader.Read(requiredLevel);
+        m_skillRequirements[skillName] = requiredLevel;
+    }
+}
+
+void Quest::SerializeToText(TextWriter& writer) const {
+    writer.Write("questId", m_id);
+    writer.Write("questTitle", m_title);
+    writer.Write("questDescription", m_description);
+    writer.Write("questState", static_cast<int>(m_state));
+    writer.Write("questExperienceReward", m_experienceReward);
+    
+    // Write skill requirements count
+    writer.Write("questSkillReqCount", static_cast<int>(m_skillRequirements.size()));
+    
+    // Write each skill requirement
+    int index = 0;
+    for (const auto& pair : m_skillRequirements) {
+        std::string prefix = "questSkillReq" + std::to_string(index) + "_";
+        writer.Write(prefix + "skill", pair.first);
+        writer.Write(prefix + "level", pair.second);
+        index++;
+    }
+}
+
+// Quest text deserialization
+void Quest::DeserializeFromText(TextReader& reader) {
+    reader.Read("questId", m_id);
+    reader.Read("questTitle", m_title);
+    reader.Read("questDescription", m_description);
+    
+    int state = 0;
+    reader.Read("questState", state);
+    m_state = static_cast<QuestState>(state);
+    
+    reader.Read("questExperienceReward", m_experienceReward);
+    
+    // Read skill requirements
+    int reqCount = 0;
+    reader.Read("questSkillReqCount", reqCount);
+    
+    m_skillRequirements.clear();
+    for (int i = 0; i < reqCount; i++) {
+        std::string prefix = "questSkillReq" + std::to_string(i) + "_";
+        
+        std::string skillName;
+        int requiredLevel = 0;
+        
+        reader.Read(prefix + "skill", skillName);
+        reader.Read(prefix + "level", requiredLevel);
+        
+        m_skillRequirements[skillName] = requiredLevel;
+    }
+}
+
+QuestSystem::QuestSystem() {
+    // Define system dependencies
+    m_dependencies.insert("CharacterProgressionSystem");
+}
+
+QuestSystem::~QuestSystem() {
+    Destroy();
+    // Shutdown();
+}
+
+void QuestSystem::Initialize() {
+    LOG(Info, "Quest System Initialized.");
+}
+
+void QuestSystem::Shutdown() {
+    m_quests.clear();
+    LOG(Info, "Quest System Shutdown.");
+}
+
+void QuestSystem::Update(float deltaTime) {
+    // Check for time-based quest updates
+}
+
+QuestResult QuestSystem::AddQuest(const std::string& id, const std::string& title, const std::string& description) {
+    
+    if (m_quests.find(id) != m_quests.end()) {
+        LOG(Warning, "Quest already exists: {0}", String(id.c_str()));
+        return QuestResult::AlreadyExists;
+    }
+    
+    try {
+        auto quest = std::make_unique<Quest>(id, title, description);
+        m_quests[id] = std::move(quest);
+        
+        LOG(Info, "Added quest: {0}", String(title.c_str()));
+        return QuestResult::Success;
+    }
+    catch (const std::exception& e) {
+        LOG(Error, "Failed to add quest: {0}. Error: {1}", 
+            String(id.c_str()), String(e.what()));
+        return QuestResult::Error;
+    }
+}
+
+QuestResult QuestSystem::ActivateQuest(const std::string& id) {
+    auto it = m_quests.find(id);
+    if (it == m_quests.end()) {
+        LOG(Warning, "Quest not found: {0}", String(id.c_str()));
+        return QuestResult::NotFound;
+    }
+
+    Quest* quest = it->second.get();
+    if (quest->GetState() != QuestState::Available) {
+        LOG(Warning, "Quest not available: {0}", String(id.c_str()));
+        return QuestResult::InvalidState;
+    }
+
+    // Check character progression requirements
+    auto* progressionSystem = m_plugin->GetSystem<CharacterProgressionSystem>();
+
+    if (progressionSystem) {
+        if (!quest->CheckRequirements(progressionSystem->GetSkills())) {
+            LOG(Info, "Character doesn't meet quest requirements: {0}", String(id.c_str()));
+            return QuestResult::RequirementsNotMet;
+        }
+    }
+
+    // Store old state and update to new state
+    QuestState oldState = quest->GetState();
+    quest->SetState(QuestState::Active);
+
+    // Create and publish event
+    QuestStateChangedEvent event;
+    event.questId = id;
+    event.questTitle = quest->GetTitle();
+    event.oldState = oldState;
+    event.newState = QuestState::Active;
+    m_plugin->GetEventSystem().Publish(event);
+    
+    LOG(Info, "Activated quest: {0}", String(id.c_str()));
+    return QuestResult::Success;
+}
+
+QuestResult QuestSystem::CompleteQuest(const std::string& id) {
+    std::string questTitle;
+    int experienceReward = 0;
+    QuestState oldState;
+    bool success = false;
+    
+        
+    auto it = m_quests.find(id);
+    if (it == m_quests.end()) {
+        LOG(Warning, "Quest not found: {0}", String(id.c_str()));
+        return QuestResult::NotFound;
+    }
+    
+    Quest* quest = it->second.get();
+    if (quest->GetState() != QuestState::Active) {
+        LOG(Warning, "Quest not active: {0}", String(id.c_str()));
+        return QuestResult::InvalidState;
+    }
+    
+    oldState = quest->GetState();
+    questTitle = quest->GetTitle();
+    experienceReward = quest->GetExperienceReward();
+    
+    quest->SetState(QuestState::Completed);
+    success = true;
+    
+    if (success) {
+        // Completion event
+        QuestCompletedEvent completedEvent;
+        completedEvent.questId = id;
+        completedEvent.questTitle = questTitle;
+        completedEvent.experienceGained = experienceReward;
+        m_plugin->GetEventSystem().Publish(completedEvent);
+        
+        // State change event 
+        QuestStateChangedEvent stateEvent;
+        stateEvent.questId = id;
+        stateEvent.questTitle = questTitle;
+        stateEvent.oldState = oldState;
+        stateEvent.newState = QuestState::Completed;
+        m_plugin->GetEventSystem().Publish(stateEvent);
+
+        LOG(Info, "Completed quest: {0}", String(id.c_str()));
+        return QuestResult::Success;
+    }
+    
+    return QuestResult::Error;
+}
+
+QuestResult QuestSystem::FailQuest(const std::string& id) {
+    std::string questTitle;
+    QuestState oldState;
+    bool success = false;
+    
+    auto it = m_quests.find(id);
+    if (it == m_quests.end()) {
+        LOG(Warning, "Quest not found: {0}", String(id.c_str()));
+        return QuestResult::NotFound;
+    }
+    
+    Quest* quest = it->second.get();
+    if (quest->GetState() != QuestState::Active) {
+        LOG(Warning, "Quest not active: {0}", String(id.c_str()));
+        return QuestResult::InvalidState;
+    }
+    
+    oldState = quest->GetState();
+    questTitle = quest->GetTitle();
+    quest->SetState(QuestState::Failed);
+    success = true;
+
+    if (success) {
+        QuestStateChangedEvent event;
+        event.questId = id;
+        event.questTitle = questTitle;
+        event.oldState = oldState;
+        event.newState = QuestState::Failed;
+        m_plugin->GetEventSystem().Publish(event);
+
+        LOG(Info, "Failed quest: {0}", String(id.c_str()));
+        return QuestResult::Success;
+    }
+    
+    return QuestResult::Error;
+}
+
+Quest* QuestSystem::GetQuest(const std::string& id) {    
+    auto it = m_quests.find(id);
+    if (it == m_quests.end()) { return nullptr; }
+    return it->second.get();
+}
+
+std::vector<Quest*> QuestSystem::GetAvailableQuests() const {
+    std::vector<Quest*> result;
+    for (const auto& pair : m_quests) {
+        if (pair.second->GetState() == QuestState::Available) {
+            result.push_back(pair.second.get());
+        }
+    }
+    return result;
+}
+
+std::vector<Quest*> QuestSystem::GetActiveQuests() const {
+    std::vector<Quest*> result;
+    for (const auto& pair : m_quests) {
+        if (pair.second->GetState() == QuestState::Active) {
+            result.push_back(pair.second.get());
+        }
+    }
+    return result;
+}
+
+std::vector<Quest*> QuestSystem::GetCompletedQuests() const {
+    std::vector<Quest*> result;
+    for (const auto& pair : m_quests) {
+        if (pair.second->GetState() == QuestState::Completed) {
+            result.push_back(pair.second.get());
+        }
+    }
+    return result;
+}
+
+std::vector<Quest*> QuestSystem::GetFailedQuests() const {
+    std::vector<Quest*> result;
+    for (const auto& pair : m_quests) {
+        if (pair.second->GetState() == QuestState::Failed) {
+            result.push_back(pair.second.get());
+        }
+    }
+    return result;
+}
+
+void QuestSystem::Serialize(BinaryWriter& writer) const {
+    // Write quests
+    writer.Write(static_cast<uint32_t>(m_quests.size()));
+    for (const auto& pair : m_quests) {
+        writer.Write(pair.first);  // Quest ID
+        
+        // Write quest data
+        writer.Write(pair.second->GetId());
+        writer.Write(pair.second->GetTitle());
+        writer.Write(pair.second->GetDescription());
+        writer.Write(static_cast<int32_t>(pair.second->GetState()));
+        writer.Write(pair.second->GetExperienceReward());
+        
+        // Write skill requirements
+        auto quest = pair.second.get();
+        const auto& reqMap = quest->GetSkillRequirements();
+        writer.Write(static_cast<uint32_t>(reqMap.size()));
+        
+        for (const auto& reqPair : reqMap) {
+            writer.Write(reqPair.first);  // Skill name
+            writer.Write(reqPair.second); // Required level
+        }
+    }
+    
+    LOG(Info, "QuestSystem serialized");
+}
+
+void QuestSystem::Deserialize(BinaryReader& reader) {
+    // Clear existing data
+    m_quests.clear();
+    
+    // Read quests
+    uint32_t questCount = 0;
+    reader.Read(questCount);
+    
+    for (uint32_t i = 0; i < questCount; ++i) {
+        std::string questId;
+        reader.Read(questId);
+        
+        // Read quest data
+        std::string id, title, description;
+        int32_t stateValue = 0;
+        int expReward = 0;
+        
+        reader.Read(id);
+        reader.Read(title);
+        reader.Read(description);
+        reader.Read(stateValue);
+        reader.Read(expReward);
+        
+        // Create quest
+        auto quest = std::make_unique<Quest>(id, title, description);
+        quest->SetState(static_cast<QuestState>(stateValue));
+        quest->SetExperienceReward(expReward);
+        
+        // Read skill requirements
+        uint32_t reqCount = 0;
+        reader.Read(reqCount);
+        
+        for (uint32_t j = 0; j < reqCount; ++j) {
+            std::string skillName;
+            int requiredLevel = 0;
+            reader.Read(skillName);
+            reader.Read(requiredLevel);
+            quest->AddSkillRequirement(skillName, requiredLevel);
+        }
+        
+        m_quests[questId] = std::move(quest);
+    }
+    
+    LOG(Info, "QuestSystem deserialized");
+}
+
+void QuestSystem::SerializeToText(TextWriter& writer) const {
+    // Write quest count
+    writer.Write("questCount", static_cast<int>(m_quests.size()));
+    
+    // Write each quest
+    int index = 0;
+    for (const auto& pair : m_quests) {
+        std::string prefix = "quest" + std::to_string(index) + "_";
+        writer.Write(prefix + "id", pair.first);
+        
+        // Let the quest serialize itself with the prefix
+        pair.second->SerializeToText(writer);
+        
+        index++;
+    }
+    
+    LOG(Info, "QuestSystem serialized to text");
+}
+
+void QuestSystem::DeserializeFromText(TextReader& reader) {
+    // Clear existing data
+    m_quests.clear();
+    
+    // Read quest count
+    int questCount = 0;
+    reader.Read("questCount", questCount);
+    
+    // Read each quest
+    for (int i = 0; i < questCount; i++) {
+        std::string prefix = "quest" + std::to_string(i) + "_";
+        
+        std::string questId;
+        reader.Read(prefix + "id", questId);
+        
+        // Create a placeholder quest
+        auto quest = std::make_unique<Quest>("", "", "");
+        
+        // Let the quest deserialize itself
+        quest->DeserializeFromText(reader);
+        
+        m_quests[questId] = std::move(quest);
+    }
+    
+    LOG(Info, "QuestSystem deserialized from text");
+}
+// ^ QuestSystem.cpp
+// v QuestSystem.h
+#pragma once
+
+#include "RPGSystem.h"
+#include "QuestEvents.h"
+#include "QuestTypes.h"
+#include "Serialization.h"
+
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <memory>
+
+// Forward declaration
+class CharacterProgressionSystem;
+
+class Quest {
+public:
+    Quest(const std::string& id, const std::string& title, const std::string& description);
+    
+    // Getters/Setters
+    std::string GetId() const { return m_id; }
+    std::string GetTitle() const { return m_title; }
+    std::string GetDescription() const { return m_description; }
+    QuestState GetState() const { return m_state; }
+    int GetExperienceReward() const { return m_experienceReward; }
+    
+    void SetState(QuestState state) { m_state = state; }
+    void SetExperienceReward(int reward) { m_experienceReward = reward; }
+    
+    // Add required skill check
+    void AddSkillRequirement(const std::string& skillName, int requiredLevel);
+    
+    // Check if player meets skill requirements
+    bool CheckRequirements(const std::unordered_map<std::string, int>& playerSkills) const;
+    const std::unordered_map<std::string, int>& GetSkillRequirements() const { return m_skillRequirements; }
+
+    // For serialization
+    void Serialize(BinaryWriter& writer) const;
+    void Deserialize(BinaryReader& reader);
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
+    
+private:
+    std::string m_id;
+    std::string m_title;
+    std::string m_description;
+    QuestState m_state;
+    int m_experienceReward;
+    
+    // Requirements to take/complete the quest
+    std::unordered_map<std::string, int> m_skillRequirements;
+};
+
+class QuestSystem : public RPGSystem {
+public:
+    // Delete copy constructor and assignment operator
+    QuestSystem(const QuestSystem&) = delete;
+    QuestSystem& operator=(const QuestSystem&) = delete;
+
+    // RPGSystem interface
+    void Initialize() override;
+    void Shutdown() override;
+    void Update(float deltaTime) override;
+    
+    // Implement GetName from LinenSystem
+    std::string GetName() const override { return "QuestSystem"; }
+    
+    // Quest management
+    QuestResult AddQuest(const std::string& id, const std::string& title, const std::string& description);
+    QuestResult ActivateQuest(const std::string& id);
+    QuestResult CompleteQuest(const std::string& id);
+    QuestResult FailQuest(const std::string& id);
+
+    // Quest queries
+    Quest* GetQuest(const std::string& id);
+    std::vector<Quest*> GetAvailableQuests() const;
+    std::vector<Quest*> GetActiveQuests() const;
+    std::vector<Quest*> GetCompletedQuests() const;
+    std::vector<Quest*> GetFailedQuests() const;
+    
+    // Serialization override
+    void Serialize(BinaryWriter& writer) const override;
+    void Deserialize(BinaryReader& reader) override;
+    void SerializeToText(TextWriter& writer) const;
+    void DeserializeFromText(TextReader& reader);
+
+    // Meyer's Singleton - thread-safe in C++11 and beyond
+    static QuestSystem* GetInstance() {
+        // Thread-safe in C++11 and beyond
+        static QuestSystem* instance = new QuestSystem();
+        return instance;
+    }
+    
+    // Cleanup method
+    static void Destroy() {
+        static QuestSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
+    }
+    
+    ~QuestSystem();
+    
+private:
+    // Private constructor
+    QuestSystem();
+
+    // Quest storage
+    std::unordered_map<std::string, std::unique_ptr<Quest>> m_quests;
+};
+// ^ QuestSystem.h
+// v QuestTypes.h
+#pragma once
+
+// Forward declarations and common types for Quest-related classes
+class Quest;
+
+// Quest state enum that can be used by multiple files
+enum class QuestState {
+    Available,
+    Active, 
+    Completed,
+    Failed
+};
+
+enum class QuestResult {
+    Success,            
+    NotFound,           // Quest ID not found
+    AlreadyExists,      // When trying to add a quest that already exists
+    InvalidState,       // Quest is in wrong state for the operation
+    RequirementsNotMet, // Player doesn't meet skill requirements
+    Error               // Generic error
+};
+// ^ QuestTypes.h
+// v RPGSystem.h
+#pragma once
+
+#include <string>
+#include <vector>
+#include <unordered_set>
+
+#include "LinenSystem.h"
+
+// Forward declaration
+class LinenFlax;
+class BinaryReader;
+class BinaryWriter;
+
+// Base class for all RPG systems
+class RPGSystem : public LinenSystem {
+public:
+    virtual ~RPGSystem() = default;
+    
+    // System dependencies
+    const std::unordered_set<std::string>& GetDependencies() const { return m_dependencies; }
+    
+    // Plugin reference for accessing other systems
+    void SetPlugin(LinenFlax* plugin) { m_plugin = plugin; }
+
+protected:
+    LinenFlax* m_plugin = nullptr;
+    std::unordered_set<std::string> m_dependencies;
+};
+// ^ RPGSystem.h
+// v SaveLoadSystem.cpp
+#include "SaveLoadSystem.h"
+#include "LinenFlax.h"
+#include "LinenSystemIncludes.h"
+#include "Engine/Core/Log.h"
+#include <filesystem>
+#include <fstream>
+
+namespace fs = std::filesystem;
+
+SaveLoadSystem::~SaveLoadSystem() {
+    Destroy();
+}
+
+void SaveLoadSystem::Initialize() {
+    // Register all known systems for serialization
+    RegisterSerializableSystem("CharacterProgressionSystem");
+    RegisterSerializableSystem("QuestSystem");
+    RegisterSerializableSystem("TestSystem");
+    
+    LOG(Info, "Save/Load System Initialized.");
+}
+
+void SaveLoadSystem::Shutdown() {
+    m_serializableSystems.clear();
+    LOG(Info, "Save/Load System Shutdown.");
+}
+
+void SaveLoadSystem::Update(float deltaTime) {
+    // Nothing to update regularly
+}
+
+std::string SaveLoadSystem::GetExtensionForFormat(SerializationFormat format) const {
+    switch (format) {
+        case SerializationFormat::Binary: return ".bin";
+        case SerializationFormat::Text: return ".txt";
+        default: return ".sav";
+    }
+}
+
+SerializationFormat SaveLoadSystem::GetFormatFromFilename(const std::string& filename) const {
+    fs::path filePath(filename);
+    std::string extension = filePath.extension().string();
+    
+    if (extension == ".txt") {
+        return SerializationFormat::Text;
+    } else if (extension == ".bin") {
+        return SerializationFormat::Binary;
+    } else {
+        // Default to binary for unknown extensions
+        return SerializationFormat::Binary;
+    }
+}
+
+std::string SaveLoadSystem::EnsureCorrectExtension(const std::string& filename, SerializationFormat format) const {
+    fs::path filePath(filename);
+    std::string baseFilename = filePath.stem().string();
+    std::string correctExtension = GetExtensionForFormat(format);
+    
+    return baseFilename + correctExtension;
+}
+
+RPGSystem* SaveLoadSystem::GetSystemByName(const std::string& systemName) {
+    if (systemName == "CharacterProgressionSystem") {
+        return m_plugin->GetSystem<CharacterProgressionSystem>();
+    } else if (systemName == "QuestSystem") {
+        return m_plugin->GetSystem<QuestSystem>();
+    } else if (systemName == "TestSystem") {
+        return m_plugin->GetSystem<TestSystem>();
+    }
+    return nullptr;
+}
+
+bool SaveLoadSystem::SaveGame(const std::string& filename, SerializationFormat format) {    
+    std::string saveFilename = EnsureCorrectExtension(filename, format);
+
+    const char* formatName = format == SerializationFormat::Binary ? "Binary" : "Text";
+    LOG(Info, "Saving game to: {0} (Format: {1})", String(saveFilename.c_str()), String(formatName));
+    
+    try {
+        if (format == SerializationFormat::Binary) {
+            BinaryWriter writer(saveFilename);
+            if (!writer.IsValid()) {
+                LOG(Error, "Failed to create save file: {0}", String(saveFilename.c_str()));
+                return false;
+            }
+            
+            // Write header information
+            writer.Write(static_cast<uint32_t>(m_serializableSystems.size()));
+            
+            // For each registered system, call its Serialize method
+            for (const auto& systemName : m_serializableSystems) {
+                writer.Write(systemName); // Write system name
+                
+                auto system = GetSystemByName(systemName);
+                if (system) {
+                    system->Serialize(writer);
+                    LOG(Info, "Saved system: {0}", String(systemName.c_str()));
+                } else {
+                    LOG(Warning, "System not found for serialization: {0}", String(systemName.c_str()));
+                    // Write empty placeholder
+                    uint32_t size = 0;
+                    writer.Write(size);
+                }
+            }
+        } else { // Text format
+            TextWriter textWriter;
+            
+            // Write version info
+            textWriter.Write("version", std::string("1.0.0"));  // Convert char* to std::string
+            textWriter.Write("systemCount", static_cast<int>(m_serializableSystems.size()));
+            
+            // Write system names
+            int index = 0;
+            for (const auto& systemName : m_serializableSystems) {
+                textWriter.Write("system" + std::to_string(index), systemName);
+                index++;
+            }
+            
+            // For each registered system, call its SerializeToText method
+            for (const auto& systemName : m_serializableSystems) {
+                auto system = GetSystemByName(systemName);
+                if (system) {
+                    if (systemName == "CharacterProgressionSystem") {
+                        static_cast<CharacterProgressionSystem*>(system)->SerializeToText(textWriter);
+                    } else if (systemName == "QuestSystem") {
+                        static_cast<QuestSystem*>(system)->SerializeToText(textWriter);
+                    } else if (systemName == "TestSystem") {
+                        static_cast<TestSystem*>(system)->SerializeToText(textWriter);
+                    }
+                    LOG(Info, "Saved system to text: {0}", String(systemName.c_str()));
+                } else {
+                    LOG(Warning, "System not found for text serialization: {0}", String(systemName.c_str()));
+                }
+            }
+            
+            // Save to file
+            if (!textWriter.SaveToFile(saveFilename)) {
+                LOG(Error, "Failed to write text save file: {0}", String(saveFilename.c_str()));
+                return false;
+            }
+        }
+        
+        LOG(Info, "Game saved successfully: {0}", String(saveFilename.c_str()));
+        return true;
+    } catch (const std::exception& e) {
+        LOG(Error, "Exception during save: {0}", String(e.what()));
+        return false;
+    }
+}
+
+bool SaveLoadSystem::LoadGame(const std::string& filename, SerializationFormat format) {    
+    std::string loadFilename = EnsureCorrectExtension(filename, format);
+    
+    if (!fs::exists(loadFilename)) {
+        LOG(Error, "Save file not found: {0}", String(loadFilename.c_str()));
+        return false;
+    }
+    
+    const char* formatName = format == SerializationFormat::Binary ? "Binary" : "Text";
+    LOG(Info, "Loading game from: {0} (Format: {1})", String(loadFilename.c_str()), String(formatName));
+
+    try {
+        if (format == SerializationFormat::Binary) {
+            BinaryReader reader(loadFilename);
+            if (!reader.IsValid()) {
+                LOG(Error, "Failed to open save file: {0}", String(loadFilename.c_str()));
+                return false;
+            }
+            
+            // Read header information
+            uint32_t systemCount = 0;
+            reader.Read(systemCount);
+            
+            // For each system in the file
+            for (uint32_t i = 0; i < systemCount; ++i) {
+                std::string systemName;
+                reader.Read(systemName);
+                
+                auto system = GetSystemByName(systemName);
+                if (system) {
+                    system->Deserialize(reader);
+                    LOG(Info, "Loaded system: {0}", String(systemName.c_str()));
+                } else {
+                    LOG(Warning, "System not found for deserialization: {0}", String(systemName.c_str()));
+                    // Skip data
+                    uint32_t size = 0;
+                    reader.Read(size);
+                    for (uint32_t j = 0; j < size; j++) {
+                        char dummy;
+                        reader.Read(&dummy, 1);
+                    }
+                }
+            }
+        } else { // Text format
+            TextReader textReader;
+            if (!textReader.LoadFromFile(loadFilename)) {
+                LOG(Error, "Failed to parse text save file: {0}", String(loadFilename.c_str()));
+                return false;
+            }
+            
+            // Version check (optional)
+            std::string version;
+            if (textReader.Read("version", version)) {
+                LOG(Info, "Save file version: {0}", String(version.c_str()));
+            }
+            
+            // Get system count
+            int systemCount = 0;
+            if (!textReader.Read("systemCount", systemCount)) {
+                LOG(Error, "Invalid system count in save file");
+                return false;
+            }
+            
+            // Load systems
+            for (int i = 0; i < systemCount; i++) {
+                std::string systemName;
+                if (!textReader.Read("system" + std::to_string(i), systemName)) {
+                    LOG(Warning, "Missing system name at index {0}", i);
+                    continue;
+                }
+                
+                auto system = GetSystemByName(systemName);
+                if (system) {
+                    if (systemName == "CharacterProgressionSystem") {
+                        static_cast<CharacterProgressionSystem*>(system)->DeserializeFromText(textReader);
+                    } else if (systemName == "QuestSystem") {
+                        static_cast<QuestSystem*>(system)->DeserializeFromText(textReader);
+                    } else if (systemName == "TestSystem") {
+                        static_cast<TestSystem*>(system)->DeserializeFromText(textReader);
+                    }
+                    
+                    LOG(Info, "Loaded system from text: {0}", String(systemName.c_str()));
+                } else {
+                    LOG(Warning, "System not found for text deserialization: {0}", String(systemName.c_str()));
+                }
+            }
+        }
+        
+        LOG(Info, "Game loaded successfully: {0}", String(loadFilename.c_str()));
+        return true;
+    } catch (const std::exception& e) {
+        LOG(Error, "Exception during load: {0}", String(e.what()));
+        return false;
+    }
+}
+
+void SaveLoadSystem::RegisterSerializableSystem(const std::string& systemName) {
+    m_serializableSystems.insert(systemName);
+    LOG(Info, "Registered system for serialization: {0}", String(systemName.c_str()));
+}
+
+// Default binary serialization
+void SaveLoadSystem::Serialize(BinaryWriter& writer) const {
+    // Save system's own data (if any)
+    writer.Write(static_cast<uint32_t>(m_serializableSystems.size()));
+    
+    for (const auto& systemName : m_serializableSystems) {
+        writer.Write(systemName);
+    }
+}
+
+// Default binary deserialization
+void SaveLoadSystem::Deserialize(BinaryReader& reader) {
+    // Load system's own data (if any)
+    uint32_t systemCount = 0;
+    reader.Read(systemCount);
+    
+    m_serializableSystems.clear();
+    for (uint32_t i = 0; i < systemCount; ++i) {
+        std::string systemName;
+        reader.Read(systemName);
+        m_serializableSystems.insert(systemName);
+    }
+}
+
+// Text serialization
+void SaveLoadSystem::SerializeToText(TextWriter& writer) const {
+    // Create list of system names
+    std::vector<std::string> systems;
+    for (const auto& systemName : m_serializableSystems) {
+        systems.push_back(systemName);
+    }
+    
+    // Write the number of systems
+    writer.Write("systemCount", static_cast<int>(systems.size()));
+    
+    // Write each system name
+    for (size_t i = 0; i < systems.size(); ++i) {
+        writer.Write("system" + std::to_string(i), systems[i]);
+    }
+}
+
+// Text deserialization
+void SaveLoadSystem::DeserializeFromText(TextReader& reader) {
+    m_serializableSystems.clear();
+    
+    std::vector<std::string> systems;
+    if (reader.ReadVector("registeredSystems", systems)) {
+        for (const auto& systemName : systems) {
+            m_serializableSystems.insert(systemName);
+        }
+    }
+}
+// ^ SaveLoadSystem.h
+// v SaveLoadSystem.h
+#pragma once
+
+#include "RPGSystem.h"
+#include "Serialization.h"
+#include <string>
+#include <unordered_set>
+#include <functional>
+#include <unordered_map>
+#include <memory>
+
+class SaveLoadSystem : public RPGSystem {
+public:
+    
+    // Delete copy constructor and assignment operator
+    SaveLoadSystem(const SaveLoadSystem&) = delete;
+    SaveLoadSystem& operator=(const SaveLoadSystem&) = delete;
+
+    // RPGSystem interface
+    void Initialize() override;
+    void Shutdown() override;
+    void Update(float deltaTime) override;
+
+    std::string GetName() const override { return "SaveLoadSystem"; }
+    
+    // Save/Load functionality
+    bool SaveGame(const std::string& filename, SerializationFormat format = SerializationFormat::Binary);
+    bool LoadGame(const std::string& filename, SerializationFormat format = SerializationFormat::Binary);
+    
+    // System registration for save/load
+    void RegisterSerializableSystem(const std::string& systemName);
+    
+    // Default serialization methods
+    virtual void Serialize(BinaryWriter& writer) const override;
+    virtual void Deserialize(BinaryReader& reader) override;
+    
+    // Text serialization methods
+    virtual void SerializeToText(TextWriter& writer) const;
+    virtual void DeserializeFromText(TextReader& reader);
+    
+    // Meyer's Singleton - thread-safe in C++11 and beyond
+    static SaveLoadSystem* GetInstance() {
+        // Thread-safe in C++11 and beyond
+        static SaveLoadSystem* instance = new SaveLoadSystem();
+        return instance;
+    }
+
+    // Cleanup method
+    static void Destroy() {
+        static SaveLoadSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
+    }
+    
+    ~SaveLoadSystem();
+
+private:
+    SaveLoadSystem() {};
+    
+    // Track which systems need serialization
+    std::unordered_set<std::string> m_serializableSystems;
+    
+    // Helper to get the correct system pointer based on name
+    RPGSystem* GetSystemByName(const std::string& systemName);
+    
+    // Helper functions for file extension management
+    std::string GetExtensionForFormat(SerializationFormat format) const;
+    SerializationFormat GetFormatFromFilename(const std::string& filename) const;
+    std::string EnsureCorrectExtension(const std::string& filename, SerializationFormat format) const;
+};
+// ^ SaveLoadSystem.h
+// v Serialization.h
+#pragma once
+
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <fstream>
+#include <cstdint>
+#include <sstream>
+
+enum class SerializationFormat {
+    Binary,
+    Text
+};
+
+class BinaryWriter {
+public:
+    BinaryWriter(const std::string& filename) : m_stream(filename, std::ios::binary | std::ios::out) {}
+    ~BinaryWriter() { m_stream.close(); }
+    
+    bool IsValid() const { return m_stream.good(); }
+    
+    // Write primitives
+    void Write(bool value) { Write(&value, sizeof(bool)); }
+    void Write(int32_t value) { Write(&value, sizeof(int32_t)); }
+    void Write(uint32_t value) { Write(&value, sizeof(uint32_t)); }
+    void Write(float value) { Write(&value, sizeof(float)); }
+    void Write(double value) { Write(&value, sizeof(double)); }
+    
+    // Write string
+    void Write(const std::string& value) {
+        uint32_t length = static_cast<uint32_t>(value.length());
+        Write(length);
+        if (length > 0) {
+            Write(value.data(), length);
+        }
+    }
+    
+    // Write raw data
+    void Write(const void* data, size_t size) {
+        m_stream.write(static_cast<const char*>(data), size);
+    }
+    
+    // Write container helpers
+    template<typename T>
+    void WriteVector(const std::vector<T>& vec) {
+        uint32_t size = static_cast<uint32_t>(vec.size());
+        Write(size);
+        for (const auto& item : vec) {
+            Write(item);
+        }
+    }
+    
+    // Write map
+    template<typename K, typename V>
+    void WriteMap(const std::unordered_map<K, V>& map) {
+        uint32_t size = static_cast<uint32_t>(map.size());
+        Write(size);
+        for (const auto& pair : map) {
+            Write(pair.first);
+            Write(pair.second);
+        }
+    }
+    
+private:
+    std::ofstream m_stream;
+};
+
+class BinaryReader {
+public:
+    BinaryReader(const std::string& filename) : m_stream(filename, std::ios::binary | std::ios::in) {}
+    ~BinaryReader() { m_stream.close(); }
+    
+    bool IsValid() const { return m_stream.good() && !m_stream.eof(); }
+    
+    // Read primitives
+    void Read(bool& value) { Read(&value, sizeof(bool)); }
+    void Read(int32_t& value) { Read(&value, sizeof(int32_t)); }
+    void Read(uint32_t& value) { Read(&value, sizeof(uint32_t)); }
+    void Read(float& value) { Read(&value, sizeof(float)); }
+    void Read(double& value) { Read(&value, sizeof(double)); }
+    
+    // Read string
+    void Read(std::string& value) {
+        uint32_t length = 0;
+        Read(length);
+        value.resize(length);
+        if (length > 0) {
+            Read(&value[0], length);
+        }
+    }
+    
+    // Read raw data
+    void Read(void* data, size_t size) {
+        m_stream.read(static_cast<char*>(data), size);
+    }
+    
+    // Read container helpers
+    template<typename T>
+    void ReadVector(std::vector<T>& vec) {
+        uint32_t size = 0;
+        Read(size);
+        vec.resize(size);
+        for (uint32_t i = 0; i < size; ++i) {
+            Read(vec[i]);
+        }
+    }
+    
+    // Read map
+    template<typename K, typename V>
+    void ReadMap(std::unordered_map<K, V>& map) {
+        uint32_t size = 0;
+        Read(size);
+        map.clear();
+        K key;
+        V value;
+        for (uint32_t i = 0; i < size; ++i) {
+            Read(key);
+            Read(value);
+            map[key] = value;
+        }
+    }
+    
+private:
+    std::ifstream m_stream;
+};
+
+// Simple text-based serialization
+class TextWriter {
+public:
+    TextWriter() {}
+    
+    // Generic value writing template
+    template<typename T>
+    void Write(const std::string& key, const T& value) {
+        std::stringstream ss;
+        ss << value;
+        m_data[key] = ss.str();
+    }
+    
+    // Specialization for strings (to avoid the to_string error)
+    void Write(const std::string& key, const std::string& value) {
+        m_data[key] = value;
+    }
+    
+    // Specialization for string literals
+    void Write(const std::string& key, const char* value) {
+        m_data[key] = value;
+    }
+    
+    // Write vector as comma-separated values
+    template<typename T>
+    void WriteVector(const std::string& key, const std::vector<T>& vec) {
+        std::stringstream ss;
+        for (size_t i = 0; i < vec.size(); ++i) {
+            ss << vec[i];
+            if (i < vec.size() - 1) {
+                ss << ",";
+            }
+        }
+        m_data[key] = ss.str();
+    }
+    
+    // Write map as key-value pairs
+    template<typename V>
+    void WriteMap(const std::string& key, const std::unordered_map<std::string, V>& map) {
+        std::stringstream ss;
+        size_t index = 0;
+        for (const auto& pair : map) {
+            ss << pair.first << "=" << pair.second;
+            if (index < map.size() - 1) {
+                ss << ";";
+            }
+            index++;
+        }
+        m_data[key] = ss.str();
+    }
+    
+    bool SaveToFile(const std::string& filename) {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Write in a simple key=value format
+        for (const auto& pair : m_data) {
+            file << pair.first << "=" << pair.second << std::endl;
+        }
+        file.close();
+        return true;
+    }
+    
+private:
+    std::unordered_map<std::string, std::string> m_data;
+};
+
+class TextReader {
+public:
+    TextReader() {}
+    
+    bool LoadFromFile(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = line.substr(0, pos);
+                std::string value = line.substr(pos + 1);
+                m_data[key] = value;
+            }
+        }
+        file.close();
+        return true;
+    }
+    
+    template<typename T>
+    bool Read(const std::string& key, T& value) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        std::stringstream ss(it->second);
+        ss >> value;
+        return !ss.fail();
+    }
+    
+    // Specialization for strings
+    bool Read(const std::string& key, std::string& value) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        value = it->second;
+        return true;
+    }
+    
+    // Read vector from comma-separated values
+    template<typename T>
+    bool ReadVector(const std::string& key, std::vector<T>& vec) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        std::string value = it->second;
+        std::stringstream ss(value);
+        std::string item;
+        vec.clear();
+        
+        while (std::getline(ss, item, ',')) {
+            T val;
+            std::stringstream itemSS(item);
+            itemSS >> val;
+            if (!itemSS.fail()) {
+                vec.push_back(val);
+            }
+        }
+        
+        return true;
+    }
+    
+    // Read map from key-value pairs
+    template<typename V>
+    bool ReadMap(const std::string& key, std::unordered_map<std::string, V>& map) {
+        auto it = m_data.find(key);
+        if (it == m_data.end()) {
+            return false;
+        }
+        
+        std::string value = it->second;
+        std::stringstream ss(value);
+        std::string pair;
+        map.clear();
+        
+        while (std::getline(ss, pair, ';')) {
+            size_t pos = pair.find('=');
+            if (pos != std::string::npos) {
+                std::string mapKey = pair.substr(0, pos);
+                std::string mapValue = pair.substr(pos + 1);
+                
+                V val;
+                std::stringstream valSS(mapValue);
+                valSS >> val;
+                if (!valSS.fail()) {
+                    map[mapKey] = val;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+private:
+    std::unordered_map<std::string, std::string> m_data;
+};
+// ^ Serialization.h

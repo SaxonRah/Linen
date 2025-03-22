@@ -25,12 +25,14 @@ void LinenFlax::Initialize() {
     CharacterProgressionSystem::GetInstance()->SetPlugin(this);
     QuestSystem::GetInstance()->SetPlugin(this);
     SaveLoadSystem::GetInstance()->SetPlugin(this);
+    TimeSystem::GetInstance()->SetPlugin(this);
     
     // Then initialize systems in dependency order
     TestSystem::GetInstance()->Initialize();
     CharacterProgressionSystem::GetInstance()->Initialize();
     QuestSystem::GetInstance()->Initialize();
     SaveLoadSystem::GetInstance()->Initialize();
+    TimeSystem::GetInstance()->Initialize();
     
     LOG(Info, "All LinenFlax RPG Systems initialized");
 }
@@ -39,6 +41,7 @@ void LinenFlax::Deinitialize() {
     LOG(Info, "LinenFlax::Deinitialize : ran");
     
     // Shutdown systems in reverse order
+    TimeSystem::GetInstance()->Shutdown();
     SaveLoadSystem::GetInstance()->Shutdown();
     QuestSystem::GetInstance()->Shutdown();
     CharacterProgressionSystem::GetInstance()->Shutdown();
@@ -54,6 +57,7 @@ void LinenFlax::Update(float deltaTime) {
     CharacterProgressionSystem::GetInstance()->Update(deltaTime);
     QuestSystem::GetInstance()->Update(deltaTime);
     SaveLoadSystem::GetInstance()->Update(deltaTime);
+    TimeSystem::GetInstance()->Update(deltaTime);
     
     // Process events after all systems have updated
     m_eventSystem.ProcessEvents();

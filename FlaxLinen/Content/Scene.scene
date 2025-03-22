@@ -71,10 +71,10 @@
 					"Z": 0.0
 				},
 				"Orientation": {
-					"X": 0.5176515579223633,
-					"Y": 0.0833025798201561,
-					"Z": 0.06534233689308167,
-					"W": 0.8490158915519714
+					"X": 0.21418292820453645,
+					"Y": 0.9572013020515442,
+					"Z": -0.050803251564502719,
+					"W": 0.18791058659553529
 				}
 			},
 			"Color": {
@@ -83,7 +83,8 @@
 				"B": 0.8860000371932983,
 				"A": 1.0
 			},
-			"Brightness": 10.0
+			"Brightness": 5.0,
+			"ShadowsMode": 2
 		},
 		{
 			"ID": "eb18e84d41670d6314174b89a1d5ffea",
@@ -280,6 +281,13 @@
 			"ID": "4cf4e625450fd9c33545a98c0529a2d2",
 			"TypeName": "LinenFlax.LinenTest",
 			"ParentID": "fea6bdc34d8a807a6e33ed85e72b3f94"
+		},
+		{
+			"ID": "d86017054c2fc3f0d415af92eaad10bf",
+			"TypeName": "LinenFlax.DayNightCycle",
+			"ParentID": "fea6bdc34d8a807a6e33ed85e72b3f94",
+			"SunLight": true,
+			"TimeScale": 1.0
 		},
 		{
 			"ID": "3fbaddab4fd26af366e026a750e29e3e",

@@ -17,6 +17,7 @@ void SaveLoadSystem::Initialize() {
     RegisterSerializableSystem("CharacterProgressionSystem");
     RegisterSerializableSystem("QuestSystem");
     RegisterSerializableSystem("TestSystem");
+    RegisterSerializableSystem("TimeSystem");
     
     LOG(Info, "Save/Load System Initialized.");
 }
@@ -67,6 +68,8 @@ RPGSystem* SaveLoadSystem::GetSystemByName(const std::string& systemName) {
         return m_plugin->GetSystem<QuestSystem>();
     } else if (systemName == "TestSystem") {
         return m_plugin->GetSystem<TestSystem>();
+    } else if (systemName == "TimeSystem") {
+        return m_plugin->GetSystem<TimeSystem>();
     }
     return nullptr;
 }
@@ -127,6 +130,8 @@ bool SaveLoadSystem::SaveGame(const std::string& filename, SerializationFormat f
                         static_cast<QuestSystem*>(system)->SerializeToText(textWriter);
                     } else if (systemName == "TestSystem") {
                         static_cast<TestSystem*>(system)->SerializeToText(textWriter);
+                    } else if (systemName == "TimeSystem") {
+                        static_cast<TimeSystem*>(system)->SerializeToText(textWriter);
                     }
                     LOG(Info, "Saved system to text: {0}", String(systemName.c_str()));
                 } else {
@@ -228,6 +233,8 @@ bool SaveLoadSystem::LoadGame(const std::string& filename, SerializationFormat f
                         static_cast<QuestSystem*>(system)->DeserializeFromText(textReader);
                     } else if (systemName == "TestSystem") {
                         static_cast<TestSystem*>(system)->DeserializeFromText(textReader);
+                    } else if (systemName == "TimeSystem") {
+                        static_cast<TimeSystem*>(system)->DeserializeFromText(textReader);
                     }
                     
                     LOG(Info, "Loaded system from text: {0}", String(systemName.c_str()));

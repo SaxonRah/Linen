@@ -120,6 +120,134 @@ void LinenTest::OnEnable()
             } else {
                 LOG(Error, "Quest System not found!");
             }
+            
+            // Test TimeSystem functionality
+            auto* timeSystem = plugin->GetSystem<TimeSystem>();
+            if (timeSystem) {
+                LOG(Info, "Time System loaded");
+                
+                // Test time information
+                LOG(Info, "Current time: {0}", String(timeSystem->GetFormattedTime().c_str()));
+                LOG(Info, "Current date: {0}", String(timeSystem->GetFormattedDate().c_str()));
+                LOG(Info, "Current season: {0}", String(timeSystem->GetCurrentSeason().c_str()));
+                LOG(Info, "Day of season: {0}", timeSystem->GetDayOfSeason());
+                LOG(Info, "Is daytime: {0}", String(timeSystem->IsDaytime() ? "Yes" : "No"));
+                
+                // Test time manipulation
+                LOG(Info, "Testing time advance...");
+                timeSystem->SetTimeScale(10.0f);
+                LOG(Info, "Testing time advance...");
+                timeSystem->SetTimeScale(10.0f);  // Speed up time for testing
+                LOG(Info, "Time scale set to {0}x", timeSystem->GetTimeScale());
+                
+                // Test advancing hours
+                LOG(Info, "Before advancing: {0}", String(timeSystem->GetFormattedTime().c_str()));
+                timeSystem->AdvanceTimeSeconds(6);  // Advance 6 seconds
+                LOG(Info, "After advancing 6 seconds: {0}", String(timeSystem->GetFormattedTime().c_str()));
+                LOG(Info, "Before advancing: {0}", String(timeSystem->GetFormattedTime().c_str()));
+                timeSystem->AdvanceTimeMinutes(6);  // Advance 6 minutes
+                LOG(Info, "After advancing 6 minutes: {0}", String(timeSystem->GetFormattedTime().c_str()));
+                LOG(Info, "Before advancing: {0}", String(timeSystem->GetFormattedTime().c_str()));
+                timeSystem->AdvanceTimeHours(6);  // Advance 6 hours
+                LOG(Info, "After advancing 6 hours: {0}", String(timeSystem->GetFormattedTime().c_str()));
+
+                // Test advancing days
+                LOG(Info, "Before advancing days: {0}", String(timeSystem->GetFormattedDate().c_str()));
+                timeSystem->AdvanceDays(10);  // Advance 10 days
+                LOG(Info, "After advancing 10 days: {0}", String(timeSystem->GetFormattedDate().c_str()));
+                
+                // Test debug time setting
+                timeSystem->DebugSetTime(20, 30);  // Set to 8:30 PM
+                LOG(Info, "After debug time set: {0}", String(timeSystem->GetFormattedTime().c_str()));
+                
+                // Test time of day detection
+                TimeOfDay tod = timeSystem->GetTimeOfDay();
+                const char* todString = "";
+                switch (tod) {
+                    case TimeOfDay::Dawn: todString = "Dawn"; break;
+                    case TimeOfDay::Morning: todString = "Morning"; break;
+                    case TimeOfDay::Noon: todString = "Noon"; break;
+                    case TimeOfDay::Afternoon: todString = "Afternoon"; break;
+                    case TimeOfDay::Evening: todString = "Evening"; break;
+                    case TimeOfDay::Dusk: todString = "Dusk"; break;
+                    case TimeOfDay::Night: todString = "Night"; break;
+                    case TimeOfDay::Midnight: todString = "Midnight"; break;
+                }
+                LOG(Info, "Current time of day: {0}", String(todString));
+                
+                // Test the day progress
+                float progress = timeSystem->GetDayProgress();
+                LOG(Info, "Day progress: {0:.2f}%", progress * 100.0f);
+                
+                // Test seasons
+                LOG(Info, "Seasons in game:");
+                const auto& seasons = timeSystem->GetSeasons();
+                for (size_t i = 0; i < seasons.size(); i++) {
+                    LOG(Info, "  Season {0}: {1}", i + 1, String(seasons[i].c_str()));
+                }
+                
+                // Test season advancement
+                int initialMonth = timeSystem->GetMonth();
+                LOG(Info, "Current month: {0}", initialMonth);
+                int monthsToAdvance = 4 - initialMonth + 1;  // Go to next year's first month
+                for (int i = 0; i < monthsToAdvance; i++) {
+                    timeSystem->AdvanceDays(timeSystem->GetDaysPerMonth());
+                    LOG(Info, "Advanced to month {0} ({1})", 
+                        timeSystem->GetMonth(), 
+                        String(timeSystem->GetCurrentSeason().c_str()));
+                }
+                
+                // Test time serialization
+                LOG(Info, "Testing TimeSystem serialization...");
+                SaveLoadSystem* saveLoadSystem = plugin->GetSystem<SaveLoadSystem>();
+                if (saveLoadSystem) {
+                    // Register TimeSystem with SaveLoadSystem
+                    saveLoadSystem->RegisterSerializableSystem("TimeSystem");
+                    
+                    // Test binary serialization
+                    saveLoadSystem->SaveGame("TestTimeSystem.bin", SerializationFormat::Binary);
+                    
+                    // Change the time before loading to verify it works
+                    timeSystem->SetHour(12);
+                    timeSystem->SetDay(15);
+                    
+                    // Load and check if time was restored
+                    saveLoadSystem->LoadGame("TestTimeSystem.bin", SerializationFormat::Binary);
+                    
+                    // Test text serialization
+                    saveLoadSystem->SaveGame("TestTimeSystem.txt", SerializationFormat::Text);
+                    
+                    // Change the time again
+                    timeSystem->SetHour(9);
+                    timeSystem->SetDay(5);
+                    
+                    // Load text version
+                    saveLoadSystem->LoadGame("TestTimeSystem.txt", SerializationFormat::Text);
+                }
+            } else {
+                LOG(Error, "Time System not found!");
+            }
+
+            // Subscribe to time-related events
+            plugin->GetEventSystem().Subscribe<HourChangedEvent>(
+                [](const HourChangedEvent& event) {
+                    LOG(Info, "Event: Hour changed from {0} to {1}", 
+                        event.previousHour, event.newHour);
+                });
+                
+            plugin->GetEventSystem().Subscribe<DayChangedEvent>(
+                [](const DayChangedEvent& event) {
+                    LOG(Info, "Event: Day changed from {0} to {1} in {2}", 
+                        event.previousDay, event.newDay, 
+                        String(event.seasonName.c_str()));
+                });
+                
+            plugin->GetEventSystem().Subscribe<SeasonChangedEvent>(
+                [](const SeasonChangedEvent& event) {
+                    LOG(Info, "Event: Season changed from {0} to {1}", 
+                        String(event.previousSeason.c_str()), 
+                        String(event.newSeason.c_str()));
+                });
 
             // Test the SaveLoadSystem
             auto* saveLoadSystem = plugin->GetSystem<SaveLoadSystem>();
@@ -152,9 +280,10 @@ void LinenTest::OnEnable()
             else {
                 LOG(Warning, "LinenTest::OnEnable : Test System not found");
             }
+
+        
         } else {
             LOG(Error, "LinenTest::OnEnable : Linen Plugin not found!");
-            
             // Instead of creating a local instance, we should find out why the plugin isn't registered
             LOG(Info, "LinenTest::OnEnable : TODO Checking for all available plugins");
             // This would require additional code to list all plugins
@@ -176,6 +305,14 @@ void LinenTest::OnDisable()
 void LinenTest::OnUpdate()
 {
     // Minimal implementation
-    LOG(Info, "LinenTest::OnUpdate : ran.");
+    // LOG(Info, "LinenTest::OnUpdate : ran.");
+    
+    auto* plugin = PluginManager::GetPlugin<LinenFlax>();
+    if (plugin && typeid(*plugin) == typeid(LinenFlax)) {
+        auto* timeSystem = plugin->GetSystem<TimeSystem>();
+        if (timeSystem) {
+            // timeSystem->AdvanceTimeHours(1);
+        }
+    }
 }
 // ^ LinenTest.cpp

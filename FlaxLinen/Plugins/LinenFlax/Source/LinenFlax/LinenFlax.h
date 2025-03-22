@@ -183,6 +183,9 @@ T* LinenFlax::GetSystem() {
     else if constexpr (std::is_same<T, SaveLoadSystem>::value) {
         return SaveLoadSystem::GetInstance();
     }
+    else if constexpr (std::is_same<T, TimeSystem>::value) {
+        return TimeSystem::GetInstance();
+    }
     
     LOG(Warning, "LinenFlax::GetSystem : No matching system found for type {0}", String(typeid(T).name()));
     return nullptr;
