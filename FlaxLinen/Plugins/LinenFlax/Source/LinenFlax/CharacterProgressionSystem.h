@@ -35,11 +35,12 @@ public:
     // Delete copy constructor and assignment operator
     CharacterProgressionSystem(const CharacterProgressionSystem&) = delete;
     CharacterProgressionSystem& operator=(const CharacterProgressionSystem&) = delete;
-
-    // Static access method
+    
+    // Meyer's Singleton - thread-safe in C++11 and beyond
     static CharacterProgressionSystem* GetInstance() {
-        if (!s_instance) s_instance = new CharacterProgressionSystem();
-        return s_instance;
+        // Thread-safe in C++11 and beyond
+        static CharacterProgressionSystem* instance = new CharacterProgressionSystem();
+        return instance;
     }
 
     // RPGSystem interface
@@ -69,8 +70,9 @@ public:
     
     // Cleanup method
     static void Destroy() {
-        delete s_instance;
-        s_instance = nullptr;
+        static CharacterProgressionSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
     }
     
     ~CharacterProgressionSystem();
@@ -82,16 +84,10 @@ private:
     // Event handlers
     void HandleQuestCompleted(const QuestCompletedEvent& event);
 
-    // Singleton Instance
-    static CharacterProgressionSystem* s_instance;
-
     // Character data
     int m_experience = 0;
     int m_level = 1;
     std::unordered_map<std::string, std::unique_ptr<Skill>> m_skills;
     std::unordered_map<std::string, int> m_skillLevels; // Cache for requirements checking
-    
-    // Thread safety
-    mutable std::mutex m_mutex;
 };
 // ^ CharacterProgressionSystem.h

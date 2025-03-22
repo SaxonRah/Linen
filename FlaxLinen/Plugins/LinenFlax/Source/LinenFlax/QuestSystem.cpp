@@ -4,7 +4,7 @@
 #include "Linen.h"
 #include "Engine/Core/Log.h"
 
-QuestSystem* QuestSystem::s_instance = nullptr;
+// QuestSystem* QuestSystem::s_instance = nullptr;
 
 Quest::Quest(const std::string& id, const std::string& title, const std::string& description)
     : m_id(id)
@@ -52,7 +52,6 @@ void QuestSystem::Initialize() {
 }
 
 void QuestSystem::Shutdown() {
-    std::lock_guard<std::mutex> lock(m_mutex);
     m_quests.clear();
     LOG(Info, "Quest System Shutdown.");
 }
@@ -61,181 +60,193 @@ void QuestSystem::Update(float deltaTime) {
     // Check for time-based quest updates
 }
 
-bool QuestSystem::AddQuest(const std::string& id, const std::string& title, const std::string& description) {
-    std::lock_guard<std::mutex> lock(m_mutex);
+QuestResult QuestSystem::AddQuest(const std::string& id, const std::string& title, const std::string& description) {
     
     if (m_quests.find(id) != m_quests.end()) {
         LOG(Warning, "Quest already exists: {0}", String(id.c_str()));
-        return false;
+        return QuestResult::AlreadyExists;
     }
     
-    auto quest = std::make_unique<Quest>(id, title, description);
-    m_quests[id] = std::move(quest);
-    
-    LOG(Info, "Added quest: {0}", String(title.c_str()));
-    return true;
+    try {
+        auto quest = std::make_unique<Quest>(id, title, description);
+        m_quests[id] = std::move(quest);
+        
+        LOG(Info, "Added quest: {0}", String(title.c_str()));
+        return QuestResult::Success;
+    }
+    catch (const std::exception& e) {
+        LOG(Error, "Failed to add quest: {0}. Error: {1}", 
+            String(id.c_str()), String(e.what()));
+        return QuestResult::Error;
+    }
 }
 
-bool QuestSystem::ActivateQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
+QuestResult QuestSystem::ActivateQuest(const std::string& id) {
     auto it = m_quests.find(id);
     if (it == m_quests.end()) {
         LOG(Warning, "Quest not found: {0}", String(id.c_str()));
-        return false;
+        return QuestResult::NotFound;
     }
-    
+
     Quest* quest = it->second.get();
     if (quest->GetState() != QuestState::Available) {
         LOG(Warning, "Quest not available: {0}", String(id.c_str()));
-        return false;
+        return QuestResult::InvalidState;
     }
-    
+
     // Check character progression requirements
-    auto progressionSystem = m_plugin->GetSystem<CharacterProgressionSystem>();
+    auto* progressionSystem = m_plugin->GetSystem<CharacterProgressionSystem>();
+
     if (progressionSystem) {
         if (!quest->CheckRequirements(progressionSystem->GetSkills())) {
             LOG(Info, "Character doesn't meet quest requirements: {0}", String(id.c_str()));
-            return false;
+            return QuestResult::RequirementsNotMet;
         }
     }
-    
+
+    // Store old state and update to new state
     QuestState oldState = quest->GetState();
     quest->SetState(QuestState::Active);
-    
-    // Publish event without lock held
-    m_mutex.unlock();
-    PublishQuestStateChanged(quest, oldState);
-    m_mutex.lock();
-    
-    LOG(Info, "Activated quest: {0}", String(id.c_str()));
-    return true;
-}
 
-bool QuestSystem::CompleteQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
-    auto it = m_quests.find(id);
-    if (it == m_quests.end()) {
-        LOG(Warning, "Quest not found: {0}", String(id.c_str()));
-        return false;
-    }
-    
-    Quest* quest = it->second.get();
-    if (quest->GetState() != QuestState::Active) {
-        LOG(Warning, "Quest not active: {0}", String(id.c_str()));
-        return false;
-    }
-    
-    QuestState oldState = quest->GetState();
-    quest->SetState(QuestState::Completed);
-    
-    // Release lock before event publishing to prevent deadlocks
-    m_mutex.unlock();
-    
-    // Publish completion event
-    QuestCompletedEvent event;
+    // Create and publish event
+    QuestStateChangedEvent event;
     event.questId = id;
     event.questTitle = quest->GetTitle();
-    event.experienceGained = quest->GetExperienceReward();
+    event.oldState = oldState;
+    event.newState = QuestState::Active;
     
-    m_plugin->GetEventSystem().Publish(event);
+    LOG(Info, "About to publish event...");
+    if (m_plugin) {
+        LOG(Info, "Plugin is not null");
+        m_plugin->GetEventSystem().Publish(event);
+    } else {
+        LOG(Warning, "Cannot publish event: plugin reference is null");
+    }
     
-    // Publish state change event
-    PublishQuestStateChanged(quest, oldState);
-    
-    // Reacquire lock
-    m_mutex.lock();
-    
-    LOG(Info, "Completed quest: {0}", String(id.c_str()));
-    return true;
+    LOG(Info, "Activated quest: {0}", String(id.c_str()));
+    return QuestResult::Success;
 }
 
-bool QuestSystem::FailQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_mutex);
+QuestResult QuestSystem::CompleteQuest(const std::string& id) {
+    std::string questTitle;
+    int experienceReward = 0;
+    QuestState oldState;
+    bool success = false;
     
+        
     auto it = m_quests.find(id);
     if (it == m_quests.end()) {
         LOG(Warning, "Quest not found: {0}", String(id.c_str()));
-        return false;
+        return QuestResult::NotFound;
     }
     
     Quest* quest = it->second.get();
     if (quest->GetState() != QuestState::Active) {
         LOG(Warning, "Quest not active: {0}", String(id.c_str()));
-        return false;
+        return QuestResult::InvalidState;
     }
     
-    QuestState oldState = quest->GetState();
-    quest->SetState(QuestState::Failed);
+    oldState = quest->GetState();
+    questTitle = quest->GetTitle();
+    experienceReward = quest->GetExperienceReward();
     
-    // Publish event without lock held
-    m_mutex.unlock();
-    PublishQuestStateChanged(quest, oldState);
-    m_mutex.lock();
+    quest->SetState(QuestState::Completed);
+    success = true;
     
-    LOG(Info, "Failed quest: {0}", String(id.c_str()));
-    return true;
+    if (success) {
+        // Completion event
+        QuestCompletedEvent completedEvent;
+        completedEvent.questId = id;
+        completedEvent.questTitle = questTitle;
+        completedEvent.experienceGained = experienceReward;
+        m_plugin->GetEventSystem().Publish(completedEvent);
+        
+        // State change event 
+        QuestStateChangedEvent stateEvent;
+        stateEvent.questId = id;
+        stateEvent.questTitle = questTitle;
+        stateEvent.oldState = oldState;
+        stateEvent.newState = QuestState::Completed;
+        m_plugin->GetEventSystem().Publish(stateEvent);
+
+        LOG(Info, "Completed quest: {0}", String(id.c_str()));
+        return QuestResult::Success;
+    }
+    
+    return QuestResult::Error;
 }
 
-Quest* QuestSystem::GetQuest(const std::string& id) {
-    std::lock_guard<std::mutex> lock(m_mutex);
+QuestResult QuestSystem::FailQuest(const std::string& id) {
+    std::string questTitle;
+    QuestState oldState;
+    bool success = false;
     
     auto it = m_quests.find(id);
     if (it == m_quests.end()) {
-        return nullptr;
+        LOG(Warning, "Quest not found: {0}", String(id.c_str()));
+        return QuestResult::NotFound;
     }
     
+    Quest* quest = it->second.get();
+    if (quest->GetState() != QuestState::Active) {
+        LOG(Warning, "Quest not active: {0}", String(id.c_str()));
+        return QuestResult::InvalidState;
+    }
+    
+    oldState = quest->GetState();
+    questTitle = quest->GetTitle();
+    quest->SetState(QuestState::Failed);
+    success = true;
+
+    if (success) {
+        QuestStateChangedEvent event;
+        event.questId = id;
+        event.questTitle = questTitle;
+        event.oldState = oldState;
+        event.newState = QuestState::Failed;
+        m_plugin->GetEventSystem().Publish(event);
+
+        LOG(Info, "Failed quest: {0}", String(id.c_str()));
+        return QuestResult::Success;
+    }
+    
+    return QuestResult::Error;
+}
+
+Quest* QuestSystem::GetQuest(const std::string& id) {    
+    auto it = m_quests.find(id);
+    if (it == m_quests.end()) { return nullptr; }
     return it->second.get();
 }
 
 std::vector<Quest*> QuestSystem::GetAvailableQuests() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
     std::vector<Quest*> result;
     for (const auto& pair : m_quests) {
         if (pair.second->GetState() == QuestState::Available) {
             result.push_back(pair.second.get());
         }
     }
-    
     return result;
 }
 
 std::vector<Quest*> QuestSystem::GetActiveQuests() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
     std::vector<Quest*> result;
     for (const auto& pair : m_quests) {
         if (pair.second->GetState() == QuestState::Active) {
             result.push_back(pair.second.get());
         }
     }
-    
     return result;
 }
 
 std::vector<Quest*> QuestSystem::GetCompletedQuests() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
     std::vector<Quest*> result;
     for (const auto& pair : m_quests) {
         if (pair.second->GetState() == QuestState::Completed) {
             result.push_back(pair.second.get());
         }
     }
-    
     return result;
-}
-
-void QuestSystem::PublishQuestStateChanged(Quest* quest, QuestState oldState) {
-    QuestStateChangedEvent event;
-    event.questId = quest->GetId();
-    event.questTitle = quest->GetTitle();
-    event.oldState = oldState;
-    event.newState = quest->GetState();
-    
-    m_plugin->GetEventSystem().Publish(event);
 }
 
 void QuestSystem::Serialize(BinaryWriter& writer) const {

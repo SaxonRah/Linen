@@ -4,8 +4,6 @@
 #include "Linen.h"
 #include "Engine/Core/Log.h"
 
-CharacterProgressionSystem* CharacterProgressionSystem::s_instance = nullptr;
-
 Skill::Skill(const std::string& id, const std::string& name, const std::string& description)
     : m_id(id)
     , m_name(name)
@@ -36,7 +34,6 @@ void CharacterProgressionSystem::Initialize() {
 }
 
 void CharacterProgressionSystem::Shutdown() {
-    std::lock_guard<std::mutex> lock(m_mutex);
     m_skills.clear();
     m_skillLevels.clear();
     LOG(Info, "Character Progression System Shutdown.");
@@ -46,9 +43,7 @@ void CharacterProgressionSystem::Update(float deltaTime) {
     // Nothing to update regularly
 }
 
-bool CharacterProgressionSystem::AddSkill(const std::string& id, const std::string& name, const std::string& description) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
+bool CharacterProgressionSystem::AddSkill(const std::string& id, const std::string& name, const std::string& description) {    
     if (m_skills.find(id) != m_skills.end()) {
         LOG(Warning, "Skill already exists: {0}", String(id.c_str()));
         return false;
@@ -62,9 +57,7 @@ bool CharacterProgressionSystem::AddSkill(const std::string& id, const std::stri
     return true;
 }
 
-bool CharacterProgressionSystem::IncreaseSkill(const std::string& id, int amount) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
+bool CharacterProgressionSystem::IncreaseSkill(const std::string& id, int amount) {    
     auto it = m_skills.find(id);
     if (it == m_skills.end()) {
         LOG(Warning, "Skill not found: {0}", String(id.c_str()));
@@ -79,20 +72,15 @@ bool CharacterProgressionSystem::IncreaseSkill(const std::string& id, int amount
     return true;
 }
 
-int CharacterProgressionSystem::GetSkillLevel(const std::string& id) const {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
+int CharacterProgressionSystem::GetSkillLevel(const std::string& id) const {    
     auto it = m_skills.find(id);
     if (it == m_skills.end()) {
         return 0;
-    }
-    
+    }    
     return it->second->GetLevel();
 }
 
 void CharacterProgressionSystem::GainExperience(int amount) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
     int oldLevel = m_level;
     m_experience += amount;
     
@@ -107,17 +95,14 @@ void CharacterProgressionSystem::GainExperience(int amount) {
 }
 
 int CharacterProgressionSystem::GetExperience() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
     return m_experience;
 }
 
 int CharacterProgressionSystem::GetLevel() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
     return m_level;
 }
 
 const std::unordered_map<std::string, int>& CharacterProgressionSystem::GetSkills() const {
-    // No need to lock here as we're returning a const reference to the cached skill levels
     return m_skillLevels;
 }
 

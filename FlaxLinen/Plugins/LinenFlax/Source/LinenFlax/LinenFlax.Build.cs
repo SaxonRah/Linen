@@ -10,6 +10,7 @@ public class LinenFlax : GameModule
         base.Setup(options);
         BuildNativeCode = true;
         options.PublicDefinitions.Add("COMPILE_WITH_FLAX");
+        options.CompileEnv.CppVersion = CppVersion.Cpp17;
     }
 }
 // ^ LinenFlax.Build.cs

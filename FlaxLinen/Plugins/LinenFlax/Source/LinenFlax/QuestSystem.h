@@ -15,10 +15,17 @@
 // Forward declaration
 class CharacterProgressionSystem;
 
+enum class QuestResult {
+    Success,            
+    NotFound,           // Quest ID not found
+    AlreadyExists,      // When trying to add a quest that already exists
+    InvalidState,       // Quest is in wrong state for the operation
+    RequirementsNotMet, // Player doesn't meet skill requirements
+    Error               // Generic error
+};
+
 class Quest {
 public:
-    enum class State { Available, Active, Completed, Failed };
-    
     Quest(const std::string& id, const std::string& title, const std::string& description);
     
     // Getters/Setters
@@ -71,27 +78,29 @@ public:
     void Deserialize(BinaryReader& reader) override;
     
     // Quest management
-    bool AddQuest(const std::string& id, const std::string& title, const std::string& description);
-    bool ActivateQuest(const std::string& id);
-    bool CompleteQuest(const std::string& id);
-    bool FailQuest(const std::string& id);
-    
+    QuestResult AddQuest(const std::string& id, const std::string& title, const std::string& description);
+    QuestResult ActivateQuest(const std::string& id);
+    QuestResult CompleteQuest(const std::string& id);
+    QuestResult FailQuest(const std::string& id);
+
     // Quest queries
     Quest* GetQuest(const std::string& id);
     std::vector<Quest*> GetAvailableQuests() const;
     std::vector<Quest*> GetActiveQuests() const;
     std::vector<Quest*> GetCompletedQuests() const;
-
-    // Static access method
+    
+    // Meyer's Singleton - thread-safe in C++11 and beyond
     static QuestSystem* GetInstance() {
-        if (!s_instance) s_instance = new QuestSystem();
-        return s_instance;
+        // Thread-safe in C++11 and beyond
+        static QuestSystem* instance = new QuestSystem();
+        return instance;
     }
     
     // Cleanup method
     static void Destroy() {
-        delete s_instance;
-        s_instance = nullptr;
+        static QuestSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
     }
     
     ~QuestSystem();
@@ -100,16 +109,7 @@ private:
     // Private constructor
     QuestSystem();
 
-    // Internal helper methods
-    void PublishQuestStateChanged(Quest* quest, QuestState oldState);
-    
-    // Singleton instance
-    static QuestSystem* s_instance;
-    
     // Quest storage
     std::unordered_map<std::string, std::unique_ptr<Quest>> m_quests;
-    
-    // Thread safety
-    mutable std::mutex m_mutex;
 };
 // ^ QuestSystem.h

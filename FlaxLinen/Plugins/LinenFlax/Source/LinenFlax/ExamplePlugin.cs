@@ -2,25 +2,25 @@
 using System;
 using FlaxEngine;
 
-namespace LinenFlax
+namespace ExamplePlugin
 {
     /// <summary>
     /// The sample game plugin.
     /// </summary>
     /// <seealso cref="FlaxEngine.GamePlugin" />
-    public class LinenFlax : GamePlugin
+    public class ExamplePlugin : GamePlugin
     {
         /// <inheritdoc />
-        public LinenFlax()
+        public ExamplePlugin()
         {
             _description = new PluginDescription
             {
-                Name = "LinenFlax",
+                Name = "ExamplePlugin",
                 Category = "Other",
                 Author = "",
                 AuthorUrl = null,
                 HomepageUrl = null,
-                RepositoryUrl = "https://github.com/FlaxEngine/LinenFlax",
+                RepositoryUrl = "https://github.com/FlaxEngine/ExamplePlugin",
                 Description = "This is an example plugin project.",
                 Version = new Version(0, 0, 1),
                 IsAlpha = false,
@@ -32,13 +32,13 @@ namespace LinenFlax
         public override void Initialize()
         {
             base.Initialize();
-            Debug.Log("Hello from LinenFlax plugin C# code!");
+            Debug.Log("Hello from ExamplePlugin C# code!");
         }
 
         /// <inheritdoc />
         public override void Deinitialize()
         {
-            Debug.Log("Goodbye from LinenFlax plugin C# code!");
+            Debug.Log("Goodbye from ExamplePlugin C# code!");
             base.Deinitialize();
         }
     }

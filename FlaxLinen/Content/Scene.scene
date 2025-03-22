@@ -350,9 +350,9 @@
 			"Name": "Plant_Iris",
 			"Transform": {
 				"Translation": {
-					"X": 21.106239318847658,
+					"X": 29.23337173461914,
 					"Y": 0.0,
-					"Z": 0.0
+					"Z": -31.47369384765625
 				}
 			},
 			"Model": "78299f464648ca33a7a425998329adfc",
@@ -374,9 +374,9 @@
 			"Name": "Plant_Iris 0",
 			"Transform": {
 				"Translation": {
-					"X": 36.92101287841797,
+					"X": 45.04814529418945,
 					"Y": 0.0,
-					"Z": -0.8314037322998047
+					"Z": -32.30509948730469
 				},
 				"Orientation": {
 					"X": 0.0,
@@ -386,6 +386,60 @@
 				}
 			},
 			"Model": "78299f464648ca33a7a425998329adfc",
+			"Buffer": {
+				"Entries": [
+					{
+						"Material": "00000000000000000000000000000000",
+						"ShadowsMode": 3,
+						"Visible": true,
+						"ReceiveDecals": true
+					}
+				]
+			}
+		},
+		{
+			"ID": "ac2b7cca41637a77775201b608b16884",
+			"TypeName": "FlaxEngine.StaticModel",
+			"ParentID": "74a68a984824b4510d12589f199ad68f",
+			"Name": "Dahlia",
+			"Transform": {
+				"Translation": {
+					"X": 63.46220397949219,
+					"Y": -0.000003763078211704851,
+					"Z": -88.31793212890625
+				}
+			},
+			"Model": "fa2762e348e035ca777c139d1b6e3143",
+			"Buffer": {
+				"Entries": [
+					{
+						"Material": "00000000000000000000000000000000",
+						"ShadowsMode": 3,
+						"Visible": true,
+						"ReceiveDecals": true
+					}
+				]
+			}
+		},
+		{
+			"ID": "a79c5502421d1574788a1a924c7008fc",
+			"TypeName": "FlaxEngine.StaticModel",
+			"ParentID": "74a68a984824b4510d12589f199ad68f",
+			"Name": "Dahlia 0",
+			"Transform": {
+				"Translation": {
+					"X": 25.33820343017578,
+					"Y": -0.000007577775249956176,
+					"Z": -125.22627258300781
+				},
+				"Orientation": {
+					"X": 0.0,
+					"Y": 0.7071068286895752,
+					"Z": 0.0,
+					"W": 0.7071067094802856
+				}
+			},
+			"Model": "fa2762e348e035ca777c139d1b6e3143",
 			"Buffer": {
 				"Entries": [
 					{

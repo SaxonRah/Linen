@@ -20,13 +20,38 @@ void LinenTest::OnEnable()
         auto* plugin = PluginManager::GetPlugin<Linen>();
         
         if (plugin) {
-            LOG(Info, "LinenTest::OnEnable : Found Linen Plugin!");
+            LOG(Info, "LinenTest::OnEnable : Found Linen Plugin, manually initializing...");
+            
+            // Set plugin references first
+            TestSystem::GetInstance()->SetPlugin(plugin);
+            CharacterProgressionSystem::GetInstance()->SetPlugin(plugin);
+            QuestSystem::GetInstance()->SetPlugin(plugin);
 
-            // Test some functionality
+            LOG(Info, "Initializing systems...");
+            plugin->Initialize();
+            
+            // Test CharacterProgressionSystem functionality
+            auto* characterProgressionSystem = plugin->GetSystem<CharacterProgressionSystem>();
+            if (characterProgressionSystem) {
+                LOG(Info, "Character Progression System loaded");
+                characterProgressionSystem->AddSkill("strength", "Strength", "Physical power");
+                characterProgressionSystem->AddSkill("intelligence", "Intelligence", "Mental acuity");
+            } else {
+                LOG(Error, "Character Progression System not found!");
+            }
+
+            // Test QuestSystem functionality
             auto* questSystem = plugin->GetSystem<QuestSystem>();
             if (questSystem) {
                 LOG(Info, "Quest System loaded");
-                questSystem->AddQuest("test_quest", "Test Quest", "A test quest");
+                questSystem->AddQuest("test_quest_completed", "Test Quest Complete", "A test quest complete.");
+                questSystem->AddQuest("test_quest_failed", "Test Quest Fail", "A test quest failing.");
+
+                questSystem->ActivateQuest("test_quest_completed");
+                questSystem->CompleteQuest("test_quest_completed");
+                
+                questSystem->ActivateQuest("test_quest_failed");
+                questSystem->FailQuest("test_quest_failed");
 
             } else {
                 LOG(Error, "Quest System not found!");

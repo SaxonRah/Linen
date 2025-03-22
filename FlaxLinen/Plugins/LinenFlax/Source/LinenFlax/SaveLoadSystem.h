@@ -33,16 +33,18 @@ public:
     virtual void Serialize(BinaryWriter& writer) const override {}
     virtual void Deserialize(BinaryReader& reader) override {}
     
-    // Static access method
-    static SaveLoadSystem* GetInstance() {
-        if (!s_instance) s_instance = new SaveLoadSystem();
-        return s_instance;
+     // Meyer's Singleton - thread-safe in C++11 and beyond
+     static SaveLoadSystem* GetInstance() {
+        // Thread-safe in C++11 and beyond
+        static SaveLoadSystem* instance = new SaveLoadSystem();
+        return instance;
     }
 
     // Cleanup method
     static void Destroy() {
-        delete s_instance;
-        s_instance = nullptr;
+        static SaveLoadSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
     }
     
     ~SaveLoadSystem() {
@@ -51,12 +53,6 @@ public:
 
 private:
     SaveLoadSystem() {};
-    
-    // Singleton Instance
-    static SaveLoadSystem* s_instance;
-
-    // Thread safety
-    std::mutex m_mutex;
     
     // Track which systems need serialization
     std::unordered_set<std::string> m_serializableSystems;

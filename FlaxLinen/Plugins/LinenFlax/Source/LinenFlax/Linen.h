@@ -4,7 +4,8 @@
 #include "Engine/Scripting/Plugins/GamePlugin.h"
 #include "Engine/Core/Log.h"
 #include "EventSystem.h"
-#include "LinenSystem.h"
+// #include "LinenSystem.h"
+#include "RPGSystem.h"
 
 #include <string>
 #include <unordered_set> 
@@ -24,7 +25,7 @@ class BinaryReader;
 class BinaryWriter;
 
 // Example test system
-class TestSystem : public LinenSystem {
+class TestSystem : public RPGSystem {
 private:
     static TestSystem* s_instance;
     int _testValue;
@@ -61,15 +62,17 @@ public:
 
     // Cleanup method (important!)
     static void Destroy() {
-        delete s_instance;
-        s_instance = nullptr;
+        static TestSystem* instance = GetInstance();
+        delete instance;
+        instance = nullptr;
     }
     
     void Update(float deltaTime) override {}
-    
+
     static TestSystem* GetInstance() {
-        if (!s_instance) s_instance = new TestSystem();
-        return s_instance;
+        // Thread-safe in C++11 and beyond
+        static TestSystem* instance = new TestSystem();
+        return instance;
     }
 
     bool AddValue(int value) {
@@ -115,29 +118,50 @@ public:
     // Thread-safe event system access
     EventSystem& GetEventSystem() { return m_eventSystem; }
 
+    // C++ 17 GetSystem
     template <typename T>
     T* GetSystem() {
-        LOG(Info, "Linen::GetSystem : Called for type: {0}", String(typeid(T).name()));
-
-        if (std::is_same<T, TestSystem>::value) {
-            LOG(Info, "Linen::GetSystem : Getting TestSystem instance");
-            return reinterpret_cast<T*>(TestSystem::GetInstance());
+        // Simple direct mapping approach
+        if constexpr (std::is_same_v<T, TestSystem>) {
+            return TestSystem::GetInstance();
         }
-
-        if (std::is_same<T, CharacterProgressionSystem>::value) {
-            LOG(Info, "Linen::GetSystem : Type match for CharacterProgressionSystem");
-            return reinterpret_cast<T*>(CharacterProgressionSystem::GetInstance());
+        else if constexpr (std::is_same_v<T, CharacterProgressionSystem>) {
+            return CharacterProgressionSystem::GetInstance();
         }
-
-        if (std::is_same<T, QuestSystem>::value) {
-            LOG(Info, "Linen::GetSystem : Type match for QuestSystem");
-            return reinterpret_cast<T*>(QuestSystem::GetInstance());
+        else if constexpr (std::is_same_v<T, QuestSystem>) {
+            return QuestSystem::GetInstance();
         }
-
-        LOG(Warning, "Linen::GetSystem : No matching system found");
+        else if constexpr (std::is_same_v<T, SaveLoadSystem>) {
+            return SaveLoadSystem::GetInstance();
+        }
+        
+        LOG(Warning, "Linen::GetSystem : No matching system found for type {0}", 
+            String(typeid(T).name()));
         return nullptr;
     }
 
+    // C++ 11 GetSystem
+    // template <typename T>
+    // T* GetSystem() {
+    //     // C++14 compatible version
+    //     if (std::is_same<T, TestSystem>::value) {
+    //         return static_cast<T*>(TestSystem::GetInstance());
+    //     }
+    //     else if (std::is_same<T, CharacterProgressionSystem>::value) {
+    //         return static_cast<T*>(CharacterProgressionSystem::GetInstance());
+    //     }
+    //     else if (std::is_same<T, QuestSystem>::value) {
+    //         return static_cast<T*>(QuestSystem::GetInstance());
+    //     }
+    //     else if (std::is_same<T, SaveLoadSystem>::value) {
+    //         return static_cast<T*>(SaveLoadSystem::GetInstance());
+    //     }
+        
+    //     LOG(Warning, "Linen::GetSystem : No matching system found for type {0}", 
+    //         String(typeid(T).name()));
+    //     return nullptr;
+    // }
+    
 private:
     // Determines correct initialization order based on dependencies
     bool DetectCycle(const std::string& systemName, 
@@ -281,40 +305,4 @@ bool Linen::UnloadSystem() {
     LOG(Info, "Unloaded system: {0}", String(systemName.c_str()));
     return true;
 }
-
-template <typename T>
-T* Linen::GetSystemOld() {
-    static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
-    
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
-    
-    auto typeIndex = std::type_index(typeid(T));
-    if (m_typeToName.find(typeIndex) == m_typeToName.end()) {
-        return nullptr;
-    }
-    
-    std::string systemName = m_typeToName[typeIndex];
-    auto it = m_activeSystems.find(systemName);
-    if (it == m_activeSystems.end()) {
-        return nullptr;
-    }
-    
-    return static_cast<T*>(it->second);
-}
-
-template <typename T>
-T* Linen::GetSystemOld(const std::string& systemName) {
-    static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
-
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
-
-    auto it = m_activeSystems.find(systemName);
-    if (it == m_activeSystems.end()) {
-        return nullptr;
-    }
-
-    // Dynamic cast to ensure type safety
-    return dynamic_cast<T*>(it->second);
-}
-
 // ^ Linen.h

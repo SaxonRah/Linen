@@ -22,19 +22,23 @@ Linen::Linen(const SpawnParams& params)
 Linen::~Linen() {
     Deinitialize();
 }
+
 void Linen::Initialize() {
     GamePlugin::Initialize();
     
     LOG(Info, "Linen::Initialize : ran");
-    
-    // Initialize systems in the correct order
-    TestSystem::GetInstance()->Initialize();
-    
+
+    // Set plugin references first
+    TestSystem::GetInstance()->SetPlugin(this);
     CharacterProgressionSystem::GetInstance()->SetPlugin(this);
-    CharacterProgressionSystem::GetInstance()->Initialize();
-    
     QuestSystem::GetInstance()->SetPlugin(this);
+    
+    // Then initialize systems in dependency order
+    TestSystem::GetInstance()->Initialize();
+    CharacterProgressionSystem::GetInstance()->Initialize();
     QuestSystem::GetInstance()->Initialize();
+    
+    LOG(Info, "All Linen RPG Systems initialized");
 }
 
 void Linen::Deinitialize() {
@@ -124,6 +128,4 @@ void Linen::CalculateInitializationOrder() {
         visit(pair.first);
     }
 }
-
-// template RPGSystem* Linen::GetSystem<RPGSystem>(const std::string&);
 // ^ Linen.cpp
