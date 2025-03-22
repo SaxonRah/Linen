@@ -3,11 +3,9 @@
 #include "LinenSystemIncludes.h" // Include all systems
 #include "Engine/Core/Log.h"
 
-// int TestSystem::s_testValue = 0;
-TestSystem* TestSystem::s_instance = nullptr;
+// IMPLEMENT_GAME_PLUGIN(Linen, "Linen", "1.0", "ParabolicLabs");
 
-Linen::Linen(const SpawnParams& params)
-    : GamePlugin(params)
+Linen::Linen(const SpawnParams& params) : GamePlugin(params)
 {
     _description.Name = TEXT("Linen");
 #if USE_EDITOR
@@ -17,10 +15,6 @@ Linen::Linen(const SpawnParams& params)
     _description.RepositoryUrl = TEXT("");
 #endif
     _description.Version = Version(1, 0, 0);
-}
-
-Linen::~Linen() {
-    Deinitialize();
 }
 
 void Linen::Initialize() {
@@ -53,8 +47,9 @@ void Linen::Deinitialize() {
     QuestSystem::Destroy();
     CharacterProgressionSystem::Destroy();
     TestSystem::Destroy();
-    
+
     LOG(Info, "Linen Plugin Deinitialized.");
+    GamePlugin::Deinitialize();
 }
 
 void Linen::Update(float deltaTime) {
@@ -99,33 +94,41 @@ void Linen::CalculateInitializationOrder() {
         }
     }
 
-    std::function<void(const std::string&)> visit = [&](const std::string& systemName) {
-        if (inProgress.find(systemName) != inProgress.end()) {
-            LOG(Error, "Circular dependency detected for system: {0}", String(systemName.c_str()));
-            return;
-        }
-        
-        if (visited.find(systemName) != visited.end()) {
-            return;
-        }
-        
-        inProgress.insert(systemName);
-        
-        auto it = m_registeredSystems.find(systemName);
-        if (it != m_registeredSystems.end()) {
-            for (const auto& dep : it->second->GetDependencies()) {
-                visit(dep);
-            }
-        }
-        
-        inProgress.erase(systemName);
-        visited.insert(systemName);
-        m_initializationOrder.push_back(systemName);
-    };
+    // Reset visited set for the actual traversal
+    visited.clear();
     
     // Visit all registered systems
     for (const auto& pair : m_registeredSystems) {
-        visit(pair.first);
+        if (visited.find(pair.first) == visited.end()) {
+            VisitSystem(pair.first, visited, inProgress);
+        }
     }
+}
+
+// Implement the member function
+void Linen::VisitSystem(const std::string& systemName,
+                      std::unordered_set<std::string>& visited,
+                      std::unordered_set<std::string>& inProgress) {
+    if (inProgress.find(systemName) != inProgress.end()) {
+        LOG(Error, "Circular dependency detected for system: {0}", String(systemName.c_str()));
+        return;
+    }
+    
+    if (visited.find(systemName) != visited.end()) {
+        return;
+    }
+    
+    inProgress.insert(systemName);
+    
+    auto it = m_registeredSystems.find(systemName);
+    if (it != m_registeredSystems.end()) {
+        for (const auto& dep : it->second->GetDependencies()) {
+            VisitSystem(dep, visited, inProgress);
+        }
+    }
+    
+    inProgress.erase(systemName);
+    visited.insert(systemName);
+    m_initializationOrder.push_back(systemName);
 }
 // ^ Linen.cpp

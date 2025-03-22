@@ -4,7 +4,6 @@
 #include "Engine/Scripting/Plugins/GamePlugin.h"
 #include "Engine/Core/Log.h"
 #include "EventSystem.h"
-// #include "LinenSystem.h"
 #include "RPGSystem.h"
 
 #include <string>
@@ -12,7 +11,6 @@
 #include <unordered_map>
 #include <memory>
 #include <vector>
-#include <mutex>
 #include <typeindex>
 #include <functional>
 
@@ -27,7 +25,6 @@ class BinaryWriter;
 // Example test system
 class TestSystem : public RPGSystem {
 private:
-    static TestSystem* s_instance;
     int _testValue;
 
     // Private constructor to prevent direct instantiation
@@ -59,6 +56,13 @@ public:
         // Simple implementation
         // reader.Read(_testValue);
     }
+    
+    // GetInstance method
+    static TestSystem* GetInstance() {
+        // Thread-safe in C++11 and beyond
+        static TestSystem* instance = new TestSystem();
+        return instance;
+    }
 
     // Cleanup method (important!)
     static void Destroy() {
@@ -68,12 +72,6 @@ public:
     }
     
     void Update(float deltaTime) override {}
-
-    static TestSystem* GetInstance() {
-        // Thread-safe in C++11 and beyond
-        static TestSystem* instance = new TestSystem();
-        return instance;
-    }
 
     bool AddValue(int value) {
         LOG(Info, "TestSystem::AddValue : starting with value: {0}", value);
@@ -88,14 +86,24 @@ public:
     }
 };
 
-class Linen : public GamePlugin {
-public:
-    Linen(const SpawnParams& params);
-    ~Linen();
+API_CLASS(Namespace="ParabolicLabs") class LINENFLAX_API Linen : public GamePlugin
+{
     
+DECLARE_SCRIPTING_TYPE(Linen);
+
+public:
+        
+    // Delete copy operations
+    Linen(const Linen&) = delete;
+    Linen& operator=(const Linen&) = delete;
+
     // Core plugin lifecycle
     void Initialize() override;
     void Deinitialize() override;
+
+    /// <summary>
+    /// Updates all systems and processes events
+    /// </summary>
     void Update(float deltaTime);
 
     // System management
@@ -108,62 +116,21 @@ public:
     template <typename T>
     bool UnloadSystem();
     
-    // Safe system access
-    template <typename T>
-    T* GetSystemOld();
-
-    template <typename T>
-    T* GetSystemOld(const std::string& systemName);
-    
     // Thread-safe event system access
     EventSystem& GetEventSystem() { return m_eventSystem; }
 
-    // C++ 17 GetSystem
+    /// <summary>
+    /// Gets a specific RPG system by type
+    /// </summary>
     template <typename T>
-    T* GetSystem() {
-        // Simple direct mapping approach
-        if constexpr (std::is_same_v<T, TestSystem>) {
-            return TestSystem::GetInstance();
-        }
-        else if constexpr (std::is_same_v<T, CharacterProgressionSystem>) {
-            return CharacterProgressionSystem::GetInstance();
-        }
-        else if constexpr (std::is_same_v<T, QuestSystem>) {
-            return QuestSystem::GetInstance();
-        }
-        else if constexpr (std::is_same_v<T, SaveLoadSystem>) {
-            return SaveLoadSystem::GetInstance();
-        }
-        
-        LOG(Warning, "Linen::GetSystem : No matching system found for type {0}", 
-            String(typeid(T).name()));
-        return nullptr;
-    }
-
-    // C++ 11 GetSystem
-    // template <typename T>
-    // T* GetSystem() {
-    //     // C++14 compatible version
-    //     if (std::is_same<T, TestSystem>::value) {
-    //         return static_cast<T*>(TestSystem::GetInstance());
-    //     }
-    //     else if (std::is_same<T, CharacterProgressionSystem>::value) {
-    //         return static_cast<T*>(CharacterProgressionSystem::GetInstance());
-    //     }
-    //     else if (std::is_same<T, QuestSystem>::value) {
-    //         return static_cast<T*>(QuestSystem::GetInstance());
-    //     }
-    //     else if (std::is_same<T, SaveLoadSystem>::value) {
-    //         return static_cast<T*>(SaveLoadSystem::GetInstance());
-    //     }
-        
-    //     LOG(Warning, "Linen::GetSystem : No matching system found for type {0}", 
-    //         String(typeid(T).name()));
-    //     return nullptr;
-    // }
+    T* GetSystem();
     
 private:
     // Determines correct initialization order based on dependencies
+
+    void VisitSystem(const std::string& systemName, 
+        std::unordered_set<std::string>& visited,
+        std::unordered_set<std::string>& inProgress);
     bool DetectCycle(const std::string& systemName, 
         std::unordered_set<std::string>& visited, 
         std::unordered_set<std::string>& recursionStack);
@@ -177,19 +144,31 @@ private:
     std::unordered_map<std::string, RPGSystem*> m_activeSystems;
     std::unordered_map<std::type_index, std::string> m_typeToName;
 
-    // Thread safety
-    std::mutex m_systemsMutex;
-
     // Centralized event system
     EventSystem m_eventSystem;
 };
 
 // Template implementations
 template <typename T>
+T* Linen::GetSystem() {
+    // C++17 compatible implementation
+    if constexpr (std::is_same<T, TestSystem>::value) {
+        return TestSystem::GetInstance();
+    }
+    else if constexpr (std::is_same<T, CharacterProgressionSystem>::value) {
+        return CharacterProgressionSystem::GetInstance();
+    }
+    else if constexpr (std::is_same<T, QuestSystem>::value) {
+        return QuestSystem::GetInstance();
+    }
+    
+    LOG(Warning, "Linen::GetSystem : No matching system found for type {0}", String(typeid(T).name()));
+    return nullptr;
+}
+
+template <typename T>
 bool Linen::RegisterSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
-    
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto system = std::make_unique<T>();
     std::string systemName = system->GetName();
@@ -216,9 +195,7 @@ bool Linen::RegisterSystem() {
 template <typename T>
 bool Linen::LoadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
-    
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
-    
+   
     auto typeIndex = std::type_index(typeid(T));
     
     // Check if we know about this type
@@ -270,8 +247,6 @@ bool Linen::LoadSystem() {
 template <typename T>
 bool Linen::UnloadSystem() {
     static_assert(std::is_base_of<RPGSystem, T>::value, "T must derive from RPGSystem");
-    
-    std::lock_guard<std::mutex> lock(m_systemsMutex);
     
     auto typeIndex = std::type_index(typeid(T));
     if (m_typeToName.find(typeIndex) == m_typeToName.end()) {

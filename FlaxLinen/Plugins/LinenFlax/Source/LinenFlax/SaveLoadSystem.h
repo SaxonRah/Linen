@@ -3,7 +3,6 @@
 
 #include "RPGSystem.h"
 #include <string>
-#include <mutex>
 #include <unordered_set>
 #include <functional>
 

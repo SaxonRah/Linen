@@ -18,7 +18,12 @@ void LinenTest::OnEnable()
 
         // Try to get the plugin from the PluginManager
         auto* plugin = PluginManager::GetPlugin<Linen>();
-        
+        if (plugin && typeid(*plugin) == typeid(Linen)) {
+            // Safe to use
+        } else {
+            LOG(Error, "Retrieved wrong plugin type!");
+        }
+
         if (plugin) {
             LOG(Info, "LinenTest::OnEnable : Found Linen Plugin, manually initializing...");
             
@@ -29,7 +34,7 @@ void LinenTest::OnEnable()
 
             LOG(Info, "Initializing systems...");
             plugin->Initialize();
-            
+
             // Test CharacterProgressionSystem functionality
             auto* characterProgressionSystem = plugin->GetSystem<CharacterProgressionSystem>();
             if (characterProgressionSystem) {

@@ -1,12 +1,12 @@
 // v EventSystem.h
 #pragma once
 
+#include <string>
 #include <functional>
 #include <unordered_map>
 #include <vector>
 #include <typeindex>
 #include <memory>
-#include <mutex>
 #include <queue>
 
 // Event Priority enum class
